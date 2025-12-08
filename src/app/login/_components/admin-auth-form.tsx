@@ -20,6 +20,7 @@ import { GoogleIcon } from '@/components/icons/GoogleIcon';
 import { useAuth } from '@/firebase';
 import {
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
   User,
@@ -49,6 +50,7 @@ export function AdminAuthForm({ className, ...props }: AdminAuthFormProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
   const [isGoogleLoading, setIsGoogleLoading] = React.useState<boolean>(false);
+  const [authMode, setAuthMode] = React.useState<'signin' | 'signup'>('signin');
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(formSchema),
@@ -64,6 +66,8 @@ export function AdminAuthForm({ className, ...props }: AdminAuthFormProps) {
         description = 'Invalid credentials. Please check your email and password.';
     } else if (error.code === 'auth/invalid-email') {
         description = 'The email address is not valid.';
+    } else if (error.code === 'auth/email-already-in-use') {
+        description = 'An account with this email address already exists.';
     }
     toast({
       variant: 'destructive',
@@ -76,7 +80,12 @@ export function AdminAuthForm({ className, ...props }: AdminAuthFormProps) {
     setIsLoading(true);
     try {
       await setPersistence(auth, browserLocalPersistence);
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+      if (authMode === 'signup') {
+        const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+        await upsertAdminUser(userCredential.user);
+      } else {
+        await signInWithEmailAndPassword(auth, data.email, data.password);
+      }
       // Let the useUser hook handle redirect
     } catch (error: any) {
       handleAuthError(error);
@@ -161,10 +170,22 @@ export function AdminAuthForm({ className, ...props }: AdminAuthFormProps) {
             type="submit"
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sign In with Email
+            {authMode === 'signin' ? 'Sign In with Email' : 'Sign Up with Email'}
           </Button>
         </form>
       </Form>
+
+       <p className="text-sm text-center text-muted-foreground">
+        {authMode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
+        <Button
+          variant="link"
+          className="px-1"
+          onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
+        >
+          {authMode === 'signin' ? 'Sign Up' : 'Sign In'}
+        </Button>
+      </p>
+      
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t" />
