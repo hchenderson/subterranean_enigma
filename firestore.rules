@@ -124,6 +124,18 @@ service cloud.firestore {
     match /games/{gameId} {
       allow read, write: if isNotAnonymous();
 
+      match /hints/{hintId} {
+        // Admins can manage all hints
+        allow read, write: if isNotAnonymous();
+      }
+
+      match /teamHints/{teamHintId} {
+        // Any authenticated user can read team hints (client filters)
+        allow read: if isSignedIn();
+        // Only admins can create/update team hints
+        allow write: if isNotAnonymous();
+      }
+
       match /{allChildren=**} {
         allow read, write: if isNotAnonymous();
       }

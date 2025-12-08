@@ -18,6 +18,7 @@ import { generateParticipantCode } from '@/ai/generate-participant-code';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PrintMaterialsPanel } from '@/components/admin/PrintMaterialsPanel';
+import { HintsPanel } from '@/components/admin/HintsPanel';
 
 
 type GamePhase =
@@ -220,6 +221,10 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
             <div className="lg:col-span-2 space-y-6">
                 
                 <section>
+                    <HintsPanel gameId={gameId} teams={teams} />
+                </section>
+
+                <section>
                     <PrintMaterialsPanel gameId={gameId} />
                 </section>
 
@@ -337,5 +342,3 @@ export default function AdminGamePage({ params: { gameId } }: AdminPageProps) {
 
   return <AdminGamePageContent gameId={gameId} onSignOut={handleSignOut} />;
 }
-
-    
