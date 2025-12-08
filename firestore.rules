@@ -121,11 +121,9 @@ service cloud.firestore {
        * to validate their entry code.
        */
       match /participants/{participantId} {
-        // Allow login query if game is joinable. This is for the collectionGroup query.
-        allow list: if get(/databases/$(database)/documents/games/$(gameId)).data.isJoinable == true;
-        // Allow direct gets for joinable games as well (optional but useful).
-        allow get: if get(/databases/$(database)/documents/games/$(gameId)).data.isJoinable == true;
-        // Only admins can create/update/delete the participant codes.
+        // Allow looking up a participant by code.
+        allow read: if true;
+        // Only admins can create/update/delete participant-code docs
         allow write: if isAdmin();
       }
 
