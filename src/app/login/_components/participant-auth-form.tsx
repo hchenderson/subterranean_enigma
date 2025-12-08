@@ -31,6 +31,7 @@ import {
   getDocs,
   doc,
   setDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { setDocumentNonBlocking } from '@/firebase';
 
@@ -69,18 +70,21 @@ export function ParticipantAuthForm({
 
   async function onSubmit(data: ParticipantFormValues) {
     setIsLoading(true);
-    if (!firestore) {
-      handleAuthError('Database service is not available.');
+    if (!firestore || !auth) {
+      handleAuthError('Authentication service is not available.');
       setIsLoading(false);
       return;
     }
 
     try {
-      const participantsRef = collection(firestore, 'participants');
+      // For this simplified flow, we assume a "default-game" structure.
+      // A more robust implementation might involve selecting a game.
+      const participantsRef = collection(firestore, 'games', 'default-game', 'participants');
       const q = query(
         participantsRef,
         where('participantCode', '==', data.code.toUpperCase())
       );
+      
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
@@ -88,42 +92,45 @@ export function ParticipantAuthForm({
         setIsLoading(false);
         return;
       }
-
-      // Assuming one participant per code
-      const participantDoc = querySnapshot.docs[0];
-      const participantId = participantDoc.id;
-
+      
+      // The code is valid, now we can sign in.
       await setPersistence(auth, browserLocalPersistence);
       const userCredential = await signInAnonymously(auth);
+      const user = userCredential.user;
 
-      if (userCredential.user.uid !== participantId) {
-        // This is a complex scenario. For this app, we'll "merge" the anonymous user
-        // with the participant record ID conceptually by re-creating the participant
-        // and game state under the new anonymous UID.
-        // This is a simplification for the escape room context.
-        console.warn('Anonymous UID does not match participant ID. Re-linking...');
-        const newParticipantRef = doc(firestore, 'participants', userCredential.user.uid);
-        await setDoc(newParticipantRef, {
-            id: userCredential.user.uid,
-            participantCode: data.code.toUpperCase(),
-        });
-        const gameStateRef = doc(firestore, 'participants', userCredential.user.uid, 'gameState', 'main');
-        setDocumentNonBlocking(gameStateRef, {
-             id: 'main',
-             participantUserId: userCredential.user.uid,
-             archiveComplete: false,
-             wellComplete: false,
-             networkComplete: false,
-             archiveKey: false,
-             wellKey: false,
-             networkKey: false,
-        }, { merge: true });
-      }
+      // Now that we are authenticated, create the user's documents.
+      const batch = writeBatch(firestore);
+
+      // 1. Create the main participant document.
+      const participantRef = doc(firestore, 'participants', user.uid);
+      batch.set(participantRef, {
+        id: user.uid,
+        participantCode: data.code.toUpperCase(),
+      });
+
+      // 2. Create the initial game state for that participant.
+      const gameStateRef = doc(firestore, 'participants', user.uid, 'gameState', 'main');
+      batch.set(gameStateRef, {
+        id: 'main',
+        participantUserId: user.uid,
+        archiveComplete: false,
+        wellComplete: false,
+        networkComplete: false,
+        archiveKey: false,
+        wellKey: false,
+        networkKey: false,
+      });
+
+      await batch.commit();
 
       // Redirect is handled by the useUser hook on the parent page
     } catch (error: any) {
       console.error('Participant Login Error:', error);
-      handleAuthError('An unexpected error occurred during login.');
+      if (error.code === 'permission-denied') {
+          handleAuthError('Could not validate participant code. Please check system permissions.');
+      } else {
+        handleAuthError('An unexpected error occurred during login.');
+      }
     } finally {
       setIsLoading(false);
     }

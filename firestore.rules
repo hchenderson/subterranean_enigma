@@ -2,17 +2,18 @@
 /**
  * Core Philosophy: This ruleset enforces a strict user-ownership model that segregates administrative users from game participants. All data is private by default, and a user (whether an admin or participant) can only access documents that are directly associated with their unique user ID (UID).
  *
- * Data Structure: The data is organized into two primary top-level collections: `/admins` for administrators and `/participants` for game players. A participant's game progress is stored in a nested subcollection, `/participants/{participantId}/gameState`, ensuring that all of a user's data is contained within a single, securable data tree.
+ * Data Structure: The data is organized into three primary top-level collections: `/admins` for administrators, `/games` for game-specific data like hints and materials, and `/participants` for game players. A participant's game progress is stored in a nested subcollection, `/participants/{participantId}/gameState`, ensuring that all of a user's data is contained within a single, securable data tree.
  *
  * Key Security Decisions:
  * - Strict Segregation: Admins and Participants are stored in separate collections to prevent any overlap in access rules.
- * - Ownership-Based Access: All rules are based on the principle that the authenticated user's UID must match the document ID in the path (e.g., `{adminId}` or `{participantId}`).
- * - No Public Listing: It is impossible to list all admins or all participants. A user can only list documents within their own subcollections (e.g., their own `gameState`).
+ * - Ownership-Based Access: All rules for participant data are based on the principle that the authenticated user's UID must match the document ID in the path (e.g., `{participantId}`).
+ * - Admin Access to Game Data: Authenticated, non-anonymous users (admins) have full access to the `/games` collection, which is necessary for them to manage game content like hints and materials.
+ * - No Public Listing: It is impossible for participants to list all admins, all participants, or game-wide data. A user can only list documents within their own subcollections (e.g., their own `gameState`).
  * - Default Deny: Access is denied by default. All permissions must be explicitly granted.
  *
- * Denormalization for Authorization: The structure `/participants/{participantId}/gameState` uses the path itself as the primary authorization mechanism. This avoids the need for costly `get()` calls to a parent document when securing the `gameState` subcollection. Additionally, the `GameState` document contains a `participantUserId` field, which is validated against the path on creation to ensure relational integrity without extra database reads.
+ * Denormalization for Authorization: The structure `/participants/{participantId}/gameState` uses the path itself as the primary authorization mechanism. This avoids the need for costly `get()` calls to a parent document when securing the `gameState` subcollection.
  *
- * Structural Segregation: The use of separate top-level collections (`/admins` and `/participants`) is a clear example of structural segregation. This approach is more secure and performant than using a single `/users` collection with a role field, as it simplifies rules and prevents accidental data leakage in list queries.
+ * Public Validation Collection: The `/games/{gameId}/participants` collection is readable by anyone. This is a deliberate design choice to allow an unauthenticated user to validate an entry code *before* they sign in. This collection should ONLY store the code itself and no sensitive information.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -29,7 +30,10 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    function isNotAnonymous() {
+    /**
+     * Returns true if the user is a logged-in admin (not anonymous).
+     */
+    function isAdmin() {
       return isSignedIn() && request.auth.token.firebase.sign_in_provider != "anonymous";
     }
 
@@ -40,15 +44,6 @@ service cloud.firestore {
      */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * Returns true if the user is the owner AND the document already exists.
-     * Used for safe updates and deletes.
-     * @param userId The UID of the document owner.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
     }
 
     /**
@@ -108,70 +103,49 @@ service cloud.firestore {
     /**
      * @description Secures admin user profile documents. Only the owner of the document can read, create, update, or delete it. Listing all admins is disabled.
      * @path /admins/{adminId}
-     * @allow (get) An authenticated admin with UID 'admin123' reading their own profile at `/admins/admin123`.
-     * @deny (get) An authenticated admin with UID 'admin456' trying to read `/admins/admin123`.
-     * @deny (list) Any user trying to list the entire `/admins` collection.
-     * @principle Restricts access to a user's own data tree and prevents user enumeration.
      */
     match /admins/{adminId} {
-      allow get: if isOwner(adminId);
-      allow list: if false;
+      allow get, update, delete: if isOwner(adminId);
       allow create: if isOwner(adminId) && isCreatingOwnAdminDoc(adminId);
-      allow update: if isExistingOwner(adminId) && isAdminDocImmutable();
-      allow delete: if isExistingOwner(adminId);
+      allow list: if false;
     }
     
+    /**
+     * @description Secures game-wide data. Admins have full control. Participants have no access.
+     * @path /games/{gameId}
+     */
     match /games/{gameId} {
-      allow read, write: if isNotAnonymous();
-
-      match /hints/{hintId} {
-        // Admins can manage all hints
-        allow read, write: if isNotAnonymous();
+      allow read, write: if isAdmin();
+      
+      // Allow anyone to read the participant codes for validation purposes.
+      // This collection should ONLY contain the codes themselves.
+      match /participants/{participantId} {
+        allow read: if true;
+        allow write: if isAdmin();
       }
 
-      match /teamHints/{teamHintId} {
-        // Any authenticated user can read team hints (client filters)
-        allow read: if isSignedIn();
-        // Only admins can create/update team hints
-        allow write: if isNotAnonymous();
-      }
-
+      // Admins have full control over all subcollections within a game.
       match /{allChildren=**} {
-        allow read, write: if isNotAnonymous();
+        allow read, write: if isAdmin();
       }
     }
 
-
     /**
-     * @description Secures participant user profile documents. Similar to admins, only the owner can manage their own document. Listing all participants is disabled.
+     * @description Secures participant user profile documents. A participant can only create and manage their own document.
      * @path /participants/{participantId}
-     * @allow (create) A newly authenticated participant with UID 'player789' creating their profile document at `/participants/player789`.
-     * @deny (update) Any user trying to update a participant profile that is not their own.
-     * @deny (list) Any user trying to get a list of all participants in the game.
-     * @principle Restricts access to a user's own data tree and prevents user enumeration.
      */
     match /participants/{participantId} {
-      allow get: if isOwner(participantId);
-      // Participants cannot list other participants
-      allow list: if isNotAnonymous() || false;
-      allow create: if isOwner(participantId) && isCreatingOwnParticipantDoc(participantId) || isNotAnonymous();
-      allow update: if isExistingOwner(participantId) && isParticipantDocImmutable();
-      allow delete: if isExistingOwner(participantId);
+      allow get, update, delete: if isOwner(participantId);
+      allow create: if isOwner(participantId) && isCreatingOwnParticipantDoc(participantId);
+      allow list: if false; // Participants cannot list other participants
 
       /**
        * @description Secures the game state for each participant. A participant can only access the game state stored within their own document tree.
        * @path /participants/{participantId}/gameState/{gameStateId}
-       * @allow (list) A participant with UID 'player789' listing their own game states at `/participants/player789/gameState`.
-       * @allow (update) Participant 'player789' updating their progress in a document at `/participants/player789/gameState/save1`.
-       * @deny (get) Participant 'playerABC' trying to read a document at `/participants/player789/gameState/save1`.
-       * @principle Enforces document ownership for all operations by leveraging the hierarchical path structure.
        */
       match /gameState/{gameStateId} {
-        allow get: if isOwner(participantId);
-        allow list: if isOwner(participantId);
+        allow get, list, update, delete: if isOwner(participantId);
         allow create: if isOwner(participantId) && isCreatingValidGameState(participantId);
-        allow update: if isExistingOwner(participantId) && isGameStateImmutable();
-        allow delete: if isExistingOwner(participantId);
       }
     }
   }
