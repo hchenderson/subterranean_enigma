@@ -25,15 +25,13 @@ import {
 } from 'firebase/auth';
 import { useFirestore } from '@/firebase';
 import {
-  collection,
+  collectionGroup,
   query,
   where,
   getDocs,
   doc,
-  setDoc,
   writeBatch,
 } from 'firebase/firestore';
-import { setDocumentNonBlocking } from '@/firebase';
 
 const formSchema = z.object({
   code: z.string().min(4, { message: 'Please enter a valid code.' }),
@@ -77,9 +75,8 @@ export function ParticipantAuthForm({
     }
 
     try {
-      // For this simplified flow, we assume a "default-game" structure.
-      // A more robust implementation might involve selecting a game.
-      const participantsRef = collection(firestore, 'games', 'default-game', 'participants');
+      // Use a collection group query to find the participant code across all games.
+      const participantsRef = collectionGroup(firestore, 'participants');
       const q = query(
         participantsRef,
         where('participantCode', '==', data.code.toUpperCase())
@@ -92,8 +89,20 @@ export function ParticipantAuthForm({
         setIsLoading(false);
         return;
       }
+
+      // The code is valid. Extract the gameId from the document's path.
+      const participantDoc = querySnapshot.docs[0];
+      const pathSegments = participantDoc.ref.path.split('/');
+      // The path is games/{gameId}/participants/{participantDocId}
+      const gameId = pathSegments[1];
+
+      if (!gameId) {
+        handleAuthError('Could not determine the game for this code.');
+        setIsLoading(false);
+        return;
+      }
       
-      // The code is valid, now we can sign in.
+      // Now we can sign in.
       await setPersistence(auth, browserLocalPersistence);
       const userCredential = await signInAnonymously(auth);
       const user = userCredential.user;
@@ -106,6 +115,7 @@ export function ParticipantAuthForm({
       batch.set(participantRef, {
         id: user.uid,
         participantCode: data.code.toUpperCase(),
+        gameId: gameId, // Store the game ID for future reference
       });
 
       // 2. Create the initial game state for that participant.
