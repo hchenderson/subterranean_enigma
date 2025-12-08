@@ -1,3 +1,4 @@
+
 /**
  * Core Philosophy: This ruleset enforces a strict user-ownership model that segregates administrative users from game participants. All data is private by default, and a user (whether an admin or participant) can only access documents that are directly associated with their unique user ID (UID).
  *
@@ -138,8 +139,12 @@ service cloud.firestore {
      * @principle Restricts access to a user's own data tree and prevents user enumeration.
      */
     match /participants/{participantId} {
+      // Admins can create and read the list of participants
+      allow list, create: if isNotAnonymous();
+
       allow get: if isOwner(participantId);
-      allow list: if false;
+      // list is false for participants to prevent them from listing each other
+      allow list: if isOwner(participantId) && false;
       allow create: if isOwner(participantId) && isCreatingOwnParticipantDoc(participantId);
       allow update: if isExistingOwner(participantId) && isParticipantDocImmutable();
       allow delete: if isExistingOwner(participantId);
@@ -162,3 +167,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
