@@ -18,8 +18,8 @@ function LoginPageContent() {
       if (user.isAnonymous) {
         router.push('/');
       } else {
-        // Default admin to a specific game or dashboard
-        router.push('/admin/default-game');
+        // Default admin to the new admin console page
+        router.push('/admin');
       }
     }
   }, [user, isUserLoading, router]);

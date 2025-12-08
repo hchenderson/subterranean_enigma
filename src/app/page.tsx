@@ -29,7 +29,7 @@ function HomePageContent() {
         router.push('/login');
       } else if (!user.isAnonymous) {
         // If the user is an admin, redirect them away from the participant home page.
-        router.push('/admin/default-game');
+        router.push('/admin');
       }
     }
   }, [user, isUserLoading, router]);
