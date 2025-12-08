@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -10,15 +9,17 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { useFirestore, useDoc, useCollection, useMemoFirebase, useAuth, useUser } from '@/firebase';
-import { updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { updateDocumentNonBlocking, addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2, LogOut, PlusCircle, Copy } from 'lucide-react';
+import { Loader2, LogOut, PlusCircle, Copy, Power, PowerOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { generateParticipantCode } from '@/ai/generate-participant-code';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { PrintMaterialsPanel } from '@/components/admin/PrintMaterialsPanel';
 import { HintsPanel } from '@/components/admin/HintsPanel';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 
 type GamePhase =
@@ -32,6 +33,7 @@ type Game = {
   id: string;
   name: string;
   phase: GamePhase;
+  isJoinable?: boolean;
   createdAt?: number;
 };
 
@@ -99,6 +101,18 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
     if (!game || !firestore) return;
     const gameRef = doc(firestore, 'games', gameId);
     updateDocumentNonBlocking(gameRef, { phase: nextPhase });
+  }
+
+  function toggleJoinable(isJoinable: boolean) {
+    if (!gameRef) return;
+    // We use setDoc here to ensure it's a non-blocking UI update for the admin
+    setDocumentNonBlocking(gameRef, { isJoinable }, { merge: true });
+     toast({
+        title: `Game is now ${isJoinable ? 'joinable' : 'closed'}`,
+        description: isJoinable
+          ? 'Participants can now join using a valid code.'
+          : 'New participants can no longer join this game.',
+      });
   }
 
   async function handleGenerateCode() {
@@ -263,36 +277,60 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
                 </section>
             </div>
             
-            {/* Participant Codes Section */}
-            <Card className="lg:col-span-1">
-                <CardHeader>
-                    <CardTitle>Participant Codes</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Button onClick={handleGenerateCode} disabled={isGeneratingCode} className="w-full">
-                        {isGeneratingCode ? <Loader2 className="animate-spin" /> : <PlusCircle />}
-                        Generate New Code
-                    </Button>
+            {/* Right column for participant codes and game status */}
+            <div className="lg:col-span-1 space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Game Status</CardTitle>
+                        <CardDescription>Control whether new participants can join this game instance.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center space-x-2 rounded-lg border p-4" >
+                            <Switch 
+                                id="joinable-switch" 
+                                checked={!!game.isJoinable}
+                                onCheckedChange={toggleJoinable}
+                            />
+                            <Label htmlFor="joinable-switch" className="flex flex-col">
+                                <span>{game.isJoinable ? "Game is Joinable" : "Game is Closed"}</span>
+                                <span className="text-xs font-normal text-muted-foreground">
+                                    {game.isJoinable ? <Power className="h-4 w-4 text-green-500 inline mr-1"/> : <PowerOff className="h-4 w-4 text-red-500 inline mr-1"/>}
+                                    {game.isJoinable ? "Participants can join." : "New joins are blocked."}
+                                </span>
+                            </Label>
+                        </div>
+                    </CardContent>
+                </Card>
 
-                    <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
-                        {participants && participants.length > 0 ? (
-                             participants.map(p => (
-                                <div key={p.id} className="flex items-center justify-between bg-background p-2 rounded-md">
-                                    <span className="font-mono text-sm">{p.participantCode}</span>
-                                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(p.participantCode)}>
-                                        <Copy className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-center text-sm text-muted-foreground pt-4">No participant codes generated yet.</p>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Participant Codes</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <Button onClick={handleGenerateCode} disabled={isGeneratingCode || !game.isJoinable} className="w-full">
+                            {isGeneratingCode ? <Loader2 className="animate-spin" /> : <PlusCircle />}
+                            Generate New Code
+                        </Button>
+                        {!game.isJoinable && <p className="text-xs text-center text-amber-500">Enable "Game is Joinable" to generate new codes.</p>}
 
+                        <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                            {participants && participants.length > 0 ? (
+                                participants.map(p => (
+                                    <div key={p.id} className="flex items-center justify-between bg-background p-2 rounded-md">
+                                        <span className="font-mono text-sm">{p.participantCode}</span>
+                                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(p.participantCode)}>
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-center text-sm text-muted-foreground pt-4">No participant codes generated yet.</p>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
-
       </div>
     </main>
   );

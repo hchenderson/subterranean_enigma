@@ -8,7 +8,8 @@ import {
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
-import { useFirestore, useCollection, useAuth, useUser, useMemoFirebase, addDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useCollection, useAuth, useUser, useMemoFirebase } from '@/firebase';
+import { addDoc } from 'firebase/firestore';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, LogOut, ChevronRight, Play } from 'lucide-react';
@@ -19,6 +20,7 @@ type Game = {
   id: string;
   name: string;
   phase: 'lobby' | 'assigning' | 'playing' | 'voting' | 'ended';
+  isJoinable: boolean;
   createdAt: Timestamp;
 };
 
@@ -42,21 +44,23 @@ function AdminConsoleContent() {
   }, [games]);
 
   const handleSignOut = async () => {
+    if (!auth) return;
     await auth.signOut();
     router.push('/login');
   };
 
   const handleCreateGame = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newGameName.trim()) return;
+    if (!newGameName.trim() || !gamesRef) return;
     setIsCreating(true);
     try {
         const newGameData = {
             name: newGameName,
             phase: 'lobby',
+            isJoinable: false, // Games are not joinable by default
             createdAt: serverTimestamp(),
         };
-        const docRef = await addDocumentNonBlocking(gamesRef, newGameData);
+        const docRef = await addDoc(gamesRef, newGameData);
         setNewGameName('');
         router.push(`/admin/${docRef.id}`);
     } catch (error) {
