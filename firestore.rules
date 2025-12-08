@@ -1,0 +1,151 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model that segregates administrative users from game participants. All data is private by default, and a user (whether an admin or participant) can only access documents that are directly associated with their unique user ID (UID).
+ *
+ * Data Structure: The data is organized into two primary top-level collections: `/admins` for administrators and `/participants` for game players. A participant's game progress is stored in a nested subcollection, `/participants/{participantId}/gameState`, ensuring that all of a user's data is contained within a single, securable data tree.
+ *
+ * Key Security Decisions:
+ * - Strict Segregation: Admins and Participants are stored in separate collections to prevent any overlap in access rules.
+ * - Ownership-Based Access: All rules are based on the principle that the authenticated user's UID must match the document ID in the path (e.g., `{adminId}` or `{participantId}`).
+ * - No Public Listing: It is impossible to list all admins or all participants. A user can only list documents within their own subcollections (e.g., their own `gameState`).
+ * - Default Deny: Access is denied by default. All permissions must be explicitly granted.
+ *
+ * Denormalization for Authorization: The structure `/participants/{participantId}/gameState` uses the path itself as the primary authorization mechanism. This avoids the need for costly `get()` calls to a parent document when securing the `gameState` subcollection. Additionally, the `GameState` document contains a `participantUserId` field, which is validated against the path on creation to ensure relational integrity without extra database reads.
+ *
+ * Structural Segregation: The use of separate top-level collections (`/admins` and `/participants`) is a clear example of structural segregation. This approach is more secure and performant than using a single `/users` collection with a role field, as it simplifies rules and prevents accidental data leakage in list queries.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Returns true if the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Returns true if the requesting user's UID matches the provided userId.
+     * This is the core of the ownership model.
+     * @param userId The UID of the document owner.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Returns true if the user is the owner AND the document already exists.
+     * Used for safe updates and deletes.
+     * @param userId The UID of the document owner.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates that the AdminUser document being created contains an 'id' field
+     * that matches the document's ID in the path, ensuring relational integrity.
+     * @param adminId The document ID from the Firestore path.
+     */
+    function isCreatingOwnAdminDoc(adminId) {
+      return request.resource.data.id == adminId;
+    }
+
+    /**
+     * Enforces immutability for the critical 'id' field on an AdminUser document
+     * during an update operation, preventing ownership from being changed.
+     */
+    function isAdminDocImmutable() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * Validates that the ParticipantUser document being created contains an 'id'
+     * field that matches the document's ID, ensuring relational integrity.
+     * @param participantId The document ID from the Firestore path.
+     */
+    function isCreatingOwnParticipantDoc(participantId) {
+      return request.resource.data.id == participantId;
+    }
+
+    /**
+     * Enforces immutability for the critical 'id' field on a ParticipantUser document.
+     */
+    function isParticipantDocImmutable() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * Validates that the GameState document being created has a 'participantUserId'
+     * that correctly links it back to its parent participant document.
+     * @param participantId The parent participant's ID from the Firestore path.
+     */
+    function isCreatingValidGameState(participantId) {
+      return request.resource.data.participantUserId == participantId;
+    }
+
+    /**
+     * Enforces immutability for the critical 'participantUserId' field on a
+     * GameState document, preventing the record from being moved between users.
+     */
+    function isGameStateImmutable() {
+      return request.resource.data.participantUserId == resource.data.participantUserId;
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection Rules
+    // ------------------------------------------------------------------------
+
+    /**
+     * @description Secures admin user profile documents. Only the owner of the document can read, create, update, or delete it. Listing all admins is disabled.
+     * @path /admins/{adminId}
+     * @allow (get) An authenticated admin with UID 'admin123' reading their own profile at `/admins/admin123`.
+     * @deny (get) An authenticated admin with UID 'admin456' trying to read `/admins/admin123`.
+     * @deny (list) Any user trying to list the entire `/admins` collection.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /admins/{adminId} {
+      allow get: if isOwner(adminId);
+      allow list: if false;
+      allow create: if isOwner(adminId) && isCreatingOwnAdminDoc(adminId);
+      allow update: if isExistingOwner(adminId) && isAdminDocImmutable();
+      allow delete: if isExistingOwner(adminId);
+    }
+
+    /**
+     * @description Secures participant user profile documents. Similar to admins, only the owner can manage their own document. Listing all participants is disabled.
+     * @path /participants/{participantId}
+     * @allow (create) A newly authenticated participant with UID 'player789' creating their profile document at `/participants/player789`.
+     * @deny (update) Any user trying to update a participant profile that is not their own.
+     * @deny (list) Any user trying to get a list of all participants in the game.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /participants/{participantId} {
+      allow get: if isOwner(participantId);
+      allow list: if false;
+      allow create: if isOwner(participantId) && isCreatingOwnParticipantDoc(participantId);
+      allow update: if isExistingOwner(participantId) && isParticipantDocImmutable();
+      allow delete: if isExistingOwner(participantId);
+
+      /**
+       * @description Secures the game state for each participant. A participant can only access the game state stored within their own document tree.
+       * @path /participants/{participantId}/gameState/{gameStateId}
+       * @allow (list) A participant with UID 'player789' listing their own game states at `/participants/player789/gameState`.
+       * @allow (update) Participant 'player789' updating their progress in a document at `/participants/player789/gameState/save1`.
+       * @deny (get) Participant 'playerABC' trying to read a document at `/participants/player789/gameState/save1`.
+       * @principle Enforces document ownership for all operations by leveraging the hierarchical path structure.
+       */
+      match /gameState/{gameStateId} {
+        allow get: if isOwner(participantId);
+        allow list: if isOwner(participantId);
+        allow create: if isOwner(participantId) && isCreatingValidGameState(participantId);
+        allow update: if isExistingOwner(participantId) && isGameStateImmutable();
+        allow delete: if isExistingOwner(participantId);
+      }
+    }
+  }
+}

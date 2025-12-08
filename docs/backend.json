@@ -1,0 +1,156 @@
+{
+  "entities": {
+    "AdminUser": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AdminUser",
+      "type": "object",
+      "description": "Represents an administrative user with login credentials.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the admin user."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the admin user.",
+          "format": "email"
+        },
+        "googleId": {
+          "type": "string",
+          "description": "Google ID of the admin user if signed in with Google."
+        }
+      },
+      "required": [
+        "id",
+        "email"
+      ]
+    },
+    "ParticipantUser": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ParticipantUser",
+      "type": "object",
+      "description": "Represents a participant user identified by a unique code.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the participant user."
+        },
+        "participantCode": {
+          "type": "string",
+          "description": "Unique code assigned to the participant user for login."
+        }
+      },
+      "required": [
+        "id",
+        "participantCode"
+      ]
+    },
+    "GameState": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GameState",
+      "type": "object",
+      "description": "Represents the state of the game for a specific user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the game state entry."
+        },
+        "participantUserId": {
+          "type": "string",
+          "description": "Reference to ParticipantUser. (Relationship: ParticipantUser 1:N GameState)"
+        },
+        "archiveComplete": {
+          "type": "boolean",
+          "description": "Indicates if the Archive storyline is complete."
+        },
+        "wellComplete": {
+          "type": "boolean",
+          "description": "Indicates if the Mechanical Well storyline is complete."
+        },
+        "networkComplete": {
+          "type": "boolean",
+          "description": "Indicates if the Shrouded Network storyline is complete."
+        },
+        "archiveKey": {
+          "type": "boolean",
+          "description": "Indicates if the ECHOSPIRE key fragment has been collected."
+        },
+        "wellKey": {
+          "type": "boolean",
+          "description": "Indicates if the PULSAR-LINEAGE key fragment has been collected."
+        },
+        "networkKey": {
+          "type": "boolean",
+          "description": "Indicates if the AURELION-PRIME key fragment has been collected."
+        }
+      },
+      "required": [
+        "id",
+        "participantUserId"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/admins/{adminId}",
+        "definition": {
+          "entityName": "AdminUser",
+          "schema": {
+            "$ref": "#/backend/entities/AdminUser"
+          },
+          "description": "Stores admin user information. Only authenticated admins can read/write their own data.",
+          "params": [
+            {
+              "name": "adminId",
+              "description": "Unique identifier for the admin user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/participants/{participantId}",
+        "definition": {
+          "entityName": "ParticipantUser",
+          "schema": {
+            "$ref": "#/backend/entities/ParticipantUser"
+          },
+          "description": "Stores participant user information. Only someone with the correct code can read the data.",
+          "params": [
+            {
+              "name": "participantId",
+              "description": "Unique identifier for the participant user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/participants/{participantId}/gameState/{gameStateId}",
+        "definition": {
+          "entityName": "GameState",
+          "schema": {
+            "$ref": "#/backend/entities/GameState"
+          },
+          "description": "Stores the game state for each participant. The participant ID is included in each gameState document, ensuring data access is restricted to the appropriate participant.",
+          "params": [
+            {
+              "name": "participantId",
+              "description": "Unique identifier for the participant user."
+            },
+            {
+              "name": "gameStateId",
+              "description": "Unique identifier for the game state entry."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the login process, track the game state for each participant, and ensure secure access to the data. Authorization Independence is achieved by storing all necessary access control information directly within the documents, eliminating the need for `get()` calls in security rules. Segregation is applied to differentiate admin and participant data, and the `gameState` is structured under the user ID to ensure each user only has access to their own data.\n\n*   `/admins/{adminId}`: Stores admin user information. Security rules will ensure only authenticated admins can read/write their own data. This collection facilitates admin login.\n*   `/participants/{participantId}`: Stores participant user information using participant codes. Security rules will ensure that only someone with the correct code can read the data. This supports participant login and ensures that the correct game state is loaded for the participant.\n*   `/participants/{participantId}/gameState/{gameStateId}`: Stores the game state for each participant. The participant ID is included in each `gameState` document, ensuring data access is restricted to the appropriate participant. QAPs are maintained as list operations are secure because each participant's data is stored separately under their ID."
+  }
+}
