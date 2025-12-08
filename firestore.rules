@@ -114,7 +114,9 @@ service cloud.firestore {
      * @path /games/{gameId}
      */
     match /games/{gameId} {
-      allow read, write: if isAdmin();
+      // This rule is intentionally left more open at this level.
+      // Security is handled by the more specific rules on the subcollections below.
+      // Admins are granted broad access via the recursive `{allChildren=**}` rule.
       
       /**
        * The `participants` subcollection is special. It's a collection group that
