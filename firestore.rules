@@ -108,38 +108,28 @@ service cloud.firestore {
       allow create: if isOwner(adminId) && isCreatingOwnAdminDoc(adminId);
       allow list: if false;
     }
-    
-    /**
-     * @description Collection group query rule for participant login.
-     * Allows an unauthenticated user to query across all 'participants'
-     * subcollections, but only if the game they belong to is joinable.
-     * This is essential for validating the participant code on the login screen.
-     */
-    match /{path=**}/participants/{participantId} {
-      allow list: if get( /databases/$(database)/documents/games/$(path.split('/')[1]) ).data.isJoinable == true;
-    }
 
     /**
      * @description Secures game-wide data. Admins have full control. Participants have no access.
      * @path /games/{gameId}
      */
     match /games/{gameId} {
-      // This rule is intentionally left more open at this level.
-      // Security is handled by the more specific rules on the subcollections below.
-      // Admins are granted broad access via the recursive `{allChildren=**}` rule.
       
       /**
        * The `participants` subcollection is special. It's a collection group that
        * needs to be queryable by unauthenticated users during the login flow
-       * to validate their entry code. The collection group rule above handles this.
-       * This rule below handles direct access and creation.
+       * to validate their entry code.
        */
       match /participants/{participantId} {
+        // Allow login query if game is joinable. This is for the collectionGroup query.
+        allow list: if get(/databases/$(database)/documents/games/$(gameId)).data.isJoinable == true;
+        // Allow direct gets for joinable games as well (optional but useful).
         allow get: if get(/databases/$(database)/documents/games/$(gameId)).data.isJoinable == true;
-        allow write: if isAdmin(); // Only admins can create codes
+        // Only admins can create/update/delete the participant codes.
+        allow write: if isAdmin();
       }
 
-      // Admins have full control over all other subcollections within a game.
+      // Admins have full control over all other subcollections within a game (e.g., hints, materials).
       match /{allChildren=**} {
         allow read, write: if isAdmin();
       }
