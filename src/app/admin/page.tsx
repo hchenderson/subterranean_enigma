@@ -35,8 +35,10 @@ function AdminConsoleContent() {
 
   const sortedGames = useMemo(() => {
     if (!games) return [];
-    // Sort games by creation date, newest first
-    return [...games].sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+    // Filter out games without a timestamp and sort by creation date, newest first
+    return [...games]
+        .filter(game => game.createdAt)
+        .sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
   }, [games]);
 
   const handleSignOut = async () => {
@@ -118,7 +120,7 @@ function AdminConsoleContent() {
                         <ChevronRight className="h-5 w-5 text-accent transition-transform group-hover:translate-x-1" />
                         <div className="font-code">
                             <p className="font-bold text-foreground">{game.name}</p>
-                            <p className="text-xs text-muted-foreground">ID: {game.id} // Created: {new Date(game.createdAt.seconds * 1000).toLocaleDateString()}</p>
+                            <p className="text-xs text-muted-foreground">ID: {game.id} // Created: {game.createdAt ? new Date(game.createdAt.seconds * 1000).toLocaleDateString() : 'Pending...'}</p>
                         </div>
                     </div>
                     <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
