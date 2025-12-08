@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { useFirestore, useDoc, useCollection, useMemoFirebase, useAuth, useUser } from '@/firebase';
 import { updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Loader2, LogOut, PlusCircle, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { generateParticipantCode } from '@/ai/generate-participant-code';
@@ -50,10 +50,6 @@ type Player = {
 type Participant = {
     id: string;
     participantCode: string;
-};
-
-type AdminPageProps = {
-  params: { gameId: string };
 };
 
 function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut: () => void }) {
@@ -303,7 +299,9 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
 }
 
 
-export default function AdminGamePage({ params: { gameId } }: AdminPageProps) {
+export default function AdminGamePage() {
+  const params = useParams<{ gameId: string }>();
+  const gameId = params.gameId;
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const auth = useAuth();
