@@ -38,11 +38,16 @@
         "participantCode": {
           "type": "string",
           "description": "Unique code assigned to the participant user for login."
+        },
+        "gameId": {
+          "type": "string",
+          "description": "The ID of the game this participant belongs to."
         }
       },
       "required": [
         "id",
-        "participantCode"
+        "participantCode",
+        "gameId"
       ]
     },
     "GameState": {
@@ -206,7 +211,7 @@
       "schema": {
         "$ref": "#/backend/entities/ParticipantUser"
       },
-      "description": "Stores participant user information. Only someone with the correct code can read the data."
+      "description": "Stores participant user information. Can only be created by the user, and only the user can read/write their own data."
     },
     "/participants/{participantId}/gameState/{gameStateId}": {
       "schema": {

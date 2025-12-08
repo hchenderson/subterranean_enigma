@@ -7,6 +7,8 @@ import {
   deleteDoc,
   serverTimestamp,
   addDoc,
+  query,
+  where,
 } from 'firebase/firestore';
 import { useFirestore, useDoc, useCollection, useMemoFirebase, useAuth, useUser } from '@/firebase';
 import { updateDocumentNonBlocking, addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
@@ -30,7 +32,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import { ProgressAnalyticsPanel } from '@/components/admin/ProgressAnalyticsPanel';
 
 
 type GamePhase =
@@ -75,12 +78,17 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
 
     const teamsRef = useMemoFirebase(() => gameId ? collection(firestore, 'games', gameId, 'teams') : null, [firestore, gameId]);
     const { data: teams, isLoading: areTeamsLoading } = useCollection<Omit<Team, 'id'>>(teamsRef);
-
-    const playersRef = useMemoFirebase(() => gameId ? collection(firestore, 'games', gameId, 'players') : null, [firestore, gameId]);
-    const { data: players, isLoading: arePlayersLoading } = useCollection<Omit<Player, 'id'>>(playersRef);
     
-    const participantsRef = useMemoFirebase(() => gameId ? collection(firestore, 'games', gameId, 'participants') : null, [firestore, gameId]);
-    const { data: participants, isLoading: areParticipantsLoading } = useCollection<Omit<Participant, 'id'>>(participantsRef);
+    // This fetches the generated codes, not the logged-in participants
+    const generatedCodesRef = useMemoFirebase(() => gameId ? collection(firestore, 'games', gameId, 'participants') : null, [firestore, gameId]);
+    const { data: generatedCodes, isLoading: areCodesLoading } = useCollection<Omit<Participant, 'id'>>(generatedCodesRef);
+
+    // This query finds all participant documents that are part of the current game.
+    const activeParticipantsQuery = useMemoFirebase(
+      () => firestore ? query(collection(firestore, 'participants'), where('gameId', '==', gameId)) : null,
+      [firestore, gameId]
+    );
+    const { data: activeParticipants, isLoading: areParticipantsLoading } = useCollection(activeParticipantsQuery);
 
 
     const [isUpdating, setIsUpdating] = useState(false);
@@ -88,27 +96,7 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
     const [isDeleting, setIsDeleting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-  const playersByTeam = useMemo(() => {
-    if (!teams || !players) return {};
-    const map: Record<string, Player[]> = {};
-    for (const team of teams) {
-      map[team.id] = [];
-    }
-    for (const p of players) {
-      if (!p.teamId) continue;
-      if (!map[p.teamId]) map[p.teamId] = [];
-      map[p.teamId].push(p);
-    }
-    return map;
-  }, [teams, players]);
-
   // ---- Admin actions ----
-
-  function updatePlayerTeam(playerId: string, teamId: string | null) {
-    if (!gameId || !firestore) return;
-    const ref = doc(firestore, 'games', gameId, 'players', playerId);
-    updateDocumentNonBlocking(ref, { teamId });
-  }
 
   function changeGamePhase(nextPhase: GamePhase) {
     if (!game || !firestore) return;
@@ -145,12 +133,12 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
   }
 
   async function handleGenerateCode() {
-    if (!participantsRef) return;
+    if (!generatedCodesRef) return;
     setIsGeneratingCode(true);
     try {
         const { code } = await generateParticipantCode();
         if (code) {
-            await addDoc(participantsRef, { participantCode: code.toUpperCase() });
+            await addDoc(generatedCodesRef, { participantCode: code.toUpperCase() });
             toast({
                 title: "Code Generated",
                 description: `New participant code "${code.toUpperCase()}" has been created.`,
@@ -184,7 +172,7 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
     'ended',
   ];
   
-  const isLoading = isGameLoading || areTeamsLoading || arePlayersLoading || areParticipantsLoading;
+  const isLoading = isGameLoading || areTeamsLoading || areCodesLoading || areParticipantsLoading;
 
   if (isLoading) {
     return (
@@ -292,6 +280,10 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
             <div className="lg:col-span-2 space-y-6">
                 
                 <section>
+                    <ProgressAnalyticsPanel participants={activeParticipants} />
+                </section>
+
+                <section>
                     <HintsPanel gameId={gameId} teams={teams} />
                 </section>
 
@@ -299,43 +291,6 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
                     <PrintMaterialsPanel gameId={gameId} />
                 </section>
 
-                {/* Global player inspector */}
-                <section className="rounded-xl border border-border bg-card p-4">
-                <h2 className="text-sm font-semibold mb-2">
-                    All players (overview)
-                </h2>
-                <div className="max-h-64 overflow-y-auto">
-                    <table className="w-full text-xs">
-                    <thead className="border-b border-border text-muted-foreground">
-                        <tr>
-                        <th className="text-left py-1 pr-2">Name</th>
-                        <th className="text-left py-1 px-2">Team</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {(players ?? []).map((p) => {
-                        const team = (teams ?? []).find((t) => t.id === p.teamId);
-                        return (
-                            <tr key={p.id} className="border-b border-border/50">
-                            <td className="py-1 pr-2">
-                                {p.displayName}
-                            </td>
-                            <td className="py-1 px-2">
-                                {team ? (
-                                team.name
-                                ) : (
-                                <span className="text-muted-foreground/50">
-                                    None
-                                </span>
-                                )}
-                            </td>
-                            </tr>
-                        );
-                        })}
-                    </tbody>
-                    </table>
-                </div>
-                </section>
             </div>
             
             {/* Right column for participant codes and game status */}
@@ -375,8 +330,8 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
                         {!game.isJoinable && <p className="text-xs text-center text-amber-500">Resume game to generate new codes.</p>}
 
                         <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
-                            {participants && participants.length > 0 ? (
-                                participants.map(p => (
+                            {generatedCodes && generatedCodes.length > 0 ? (
+                                generatedCodes.map(p => (
                                     <div key={p.id} className="flex items-center justify-between bg-background p-2 rounded-md">
                                         <span className="font-mono text-sm">{p.participantCode}</span>
                                         <Button size="sm" variant="ghost" onClick={() => copyToClipboard(p.participantCode)}>
@@ -439,5 +394,3 @@ export default function AdminGamePage() {
 
   return <AdminGamePageContent gameId={gameId} onSignOut={handleSignOut} />;
 }
-
-    

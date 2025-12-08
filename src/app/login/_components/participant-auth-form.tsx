@@ -76,9 +76,9 @@ export function ParticipantAuthForm({
 
     try {
       // Use a collection group query to find the participant code across all games.
-      const participantsRef = collectionGroup(firestore, 'participants');
+      const generatedCodesRef = collectionGroup(firestore, 'participants');
       const q = query(
-        participantsRef,
+        generatedCodesRef,
         where('participantCode', '==', data.code.toUpperCase())
       );
       
@@ -91,8 +91,8 @@ export function ParticipantAuthForm({
       }
 
       // The code is valid. Extract the gameId from the document's path.
-      const participantDoc = querySnapshot.docs[0];
-      const pathSegments = participantDoc.ref.path.split('/');
+      const generatedCodeDoc = querySnapshot.docs[0];
+      const pathSegments = generatedCodeDoc.ref.path.split('/');
       // The path is games/{gameId}/participants/{participantDocId}
       const gameId = pathSegments[1];
 
@@ -137,7 +137,7 @@ export function ParticipantAuthForm({
     } catch (error: any) {
       console.error('Participant Login Error:', error);
       if (error.code === 'permission-denied') {
-          handleAuthError('Could not validate participant code. Please check system permissions.');
+          handleAuthError('Could not validate participant code. The game might be paused or does not exist.');
       } else {
         handleAuthError('An unexpected error occurred during login.');
       }

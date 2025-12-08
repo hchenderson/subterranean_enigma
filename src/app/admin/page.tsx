@@ -7,9 +7,10 @@ import {
   doc,
   serverTimestamp,
   Timestamp,
+  addDoc,
 } from 'firebase/firestore';
 import { useFirestore, useCollection, useAuth, useUser, useMemoFirebase } from '@/firebase';
-import { addDoc } from 'firebase/firestore';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, LogOut, ChevronRight, Play } from 'lucide-react';
@@ -29,7 +30,7 @@ function AdminConsoleContent() {
   const auth = useAuth();
   const router = useRouter();
 
-  const gamesRef = useMemoFirebase(() => collection(firestore, 'games'), [firestore]);
+  const gamesRef = useMemoFirebase(() => firestore ? collection(firestore, 'games'): null, [firestore]);
   const { data: games, isLoading: areGamesLoading } = useCollection<Omit<Game, 'id'>>(gamesRef);
 
   const [newGameName, setNewGameName] = useState('');
