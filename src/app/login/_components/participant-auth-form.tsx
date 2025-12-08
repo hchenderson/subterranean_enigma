@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -102,23 +103,23 @@ export function ParticipantAuthForm({
         return;
       }
       
-      // Now we can sign in.
+      // 1. Sign in first and wait for it to complete.
       await setPersistence(auth, browserLocalPersistence);
       const userCredential = await signInAnonymously(auth);
       const user = userCredential.user;
 
-      // Now that we are authenticated, create the user's documents.
+      // 2. Now that we are authenticated, create the user's documents.
       const batch = writeBatch(firestore);
 
-      // 1. Create the main participant document.
+      // Create the main participant document.
       const participantRef = doc(firestore, 'participants', user.uid);
       batch.set(participantRef, {
-        id: user.uid,
+        id: user.uid, // Ensure the 'id' field matches the UID for security rules.
         participantCode: data.code.toUpperCase(),
-        gameId: gameId, // Store the game ID for future reference
+        gameId: gameId,
       });
 
-      // 2. Create the initial game state for that participant.
+      // Create the initial game state for that participant.
       const gameStateRef = doc(firestore, 'participants', user.uid, 'gameState', 'main');
       batch.set(gameStateRef, {
         id: 'main',
