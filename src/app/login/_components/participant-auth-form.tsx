@@ -123,7 +123,7 @@ export function ParticipantAuthForm({
       const gameStateRef = doc(firestore, 'participants', user.uid, 'gameState', 'main');
       batch.set(gameStateRef, {
         id: 'main',
-        participantUserId: user.uid,
+        participantUserId: user.uid, // This field is required by security rules
         completion: {
           archive: false,
           well: false,
