@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { generateParticipantCode } from '@/ai/generate-participant-code';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PrintMaterialsPanel } from '@/components/admin/PrintMaterialsPanel';
 
 
 type GamePhase =
@@ -292,6 +293,10 @@ function AdminGamePageContent({ params, onSignOut }: AdminPageProps & { onSignOu
                     );
                 })}
                 </section>
+                
+                <section>
+                    <PrintMaterialsPanel gameId={gameId} />
+                </section>
 
                 {/* Global player inspector */}
                 <section className="rounded-xl border border-border bg-card p-4">
@@ -406,5 +411,3 @@ export default function AdminGamePage({ params }: AdminPageProps) {
 
   return <AdminGamePageContent params={params} onSignOut={handleSignOut} />;
 }
-
-    

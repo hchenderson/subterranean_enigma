@@ -88,6 +88,42 @@
         "id",
         "participantUserId"
       ]
+    },
+    "Material": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Material",
+      "type": "object",
+      "description": "Represents a printable material for a game room.",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title of the material."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional description of the material."
+        },
+        "storagePath": {
+          "type": "string",
+          "description": "Path to the file in Firebase Storage."
+        },
+        "phase": {
+          "type": "string",
+          "description": "Optional game phase this material is for."
+        },
+        "printed": {
+          "type": "boolean",
+          "description": "Whether the material has been printed."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the material is required."
+        }
+      },
+      "required": [
+        "title",
+        "storagePath"
+      ]
     }
   },
   "auth": {
@@ -147,6 +183,26 @@
             {
               "name": "gameStateId",
               "description": "Unique identifier for the game state entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/games/{gameId}/materials/{materialId}",
+        "definition": {
+          "entityName": "Material",
+          "schema": {
+            "$ref": "#/backend/entities/Material"
+          },
+          "description": "Stores printable materials associated with a specific game. Admins can read and update these materials.",
+          "params": [
+            {
+              "name": "gameId",
+              "description": "Unique identifier for the game."
+            },
+            {
+              "name": "materialId",
+              "description": "Unique identifier for the material."
             }
           ]
         }
