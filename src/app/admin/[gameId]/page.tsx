@@ -9,9 +9,8 @@ import {
   addDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { useFirestore, useDoc, useCollection, useMemoFirebase, useAuth } from '@/firebase';
+import { useFirestore, useDoc, useCollection, useMemoFirebase, useAuth, useUser } from '@/firebase';
 import { updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { Loader2, LogOut, PlusCircle, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -70,7 +69,7 @@ function AdminGamePageContent({ params, onSignOut }: AdminPageProps & { onSignOu
     const playersRef = useMemoFirebase(() => gameId ? collection(firestore, 'games', gameId, 'players') : null, [firestore, gameId]);
     const { data: players, isLoading: arePlayersLoading } = useCollection<Omit<Player, 'id'>>(playersRef);
     
-    const participantsRef = useMemoFirebase(() => collection(firestore, 'participants'), [firestore]);
+    const participantsRef = useMemoFirebase(() => gameId ? collection(firestore, 'games', gameId, 'participants') : null, [firestore, gameId]);
     const { data: participants, isLoading: areParticipantsLoading } = useCollection<Omit<Participant, 'id'>>(participantsRef);
 
 
@@ -95,23 +94,24 @@ function AdminGamePageContent({ params, onSignOut }: AdminPageProps & { onSignOu
   // ---- Admin actions ----
 
   function updatePlayerTeam(playerId: string, teamId: string | null) {
-    if (!gameId) return;
+    if (!gameId || !firestore) return;
     const ref = doc(firestore, 'games', gameId, 'players', playerId);
     updateDocumentNonBlocking(ref, { teamId });
   }
 
   function changeGamePhase(nextPhase: GamePhase) {
-    if (!game) return;
+    if (!game || !firestore) return;
     const gameRef = doc(firestore, 'games', gameId);
     updateDocumentNonBlocking(gameRef, { phase: nextPhase });
   }
 
   async function handleGenerateCode() {
+    if (!participantsRef) return;
     setIsGeneratingCode(true);
     try {
         const { code } = await generateParticipantCode();
         if (code) {
-            await addDocumentNonBlocking(participantsRef, { participantCode: code.toUpperCase() });
+            await addDoc(participantsRef, { participantCode: code.toUpperCase() });
             toast({
                 title: "Code Generated",
                 description: `New participant code "${code.toUpperCase()}" has been created.`,
@@ -158,10 +158,10 @@ function AdminGamePageContent({ params, onSignOut }: AdminPageProps & { onSignOu
 
   if (!game) {
     return (
-      <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+      <main className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="text-center space-y-2">
           <p className="text-lg font-semibold">No game found</p>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-muted-foreground">
             Make sure the game ID in the URL matches a document in <code>games/{'{gameId}'}</code>.
           </p>
         </div>
@@ -180,7 +180,7 @@ function AdminGamePageContent({ params, onSignOut }: AdminPageProps & { onSignOu
             </h1>
             <p className="text-sm text-muted-foreground">
               Game ID:{' '}
-              <span className="font-mono">{game.id}</span>
+              <span className="font-mono">{gameId}</span>
             </p>
           </div>
 
@@ -219,80 +219,6 @@ function AdminGamePageContent({ params, onSignOut }: AdminPageProps & { onSignOu
 
         <div className="grid gap-8 lg:grid-cols-3">
             <div className="lg:col-span-2 space-y-6">
-                {/* Teams & players */}
-                <section className="grid gap-4 md:grid-cols-2">
-                {(teams ?? []).map((team) => {
-                    const teamPlayers = playersByTeam[team.id] ?? [];
-
-                    return (
-                    <div
-                        key={team.id}
-                        className="rounded-xl border border-border bg-card p-4 space-y-3"
-                    >
-                        <div className="flex items-start justify-between gap-2">
-                        <div>
-                            <h2 className="text-base font-semibold">
-                            {team.name}
-                            </h2>
-                            <p className="text-xs text-muted-foreground">
-                            {teamPlayers.length} players
-                            </p>
-                        </div>
-                        </div>
-
-                        <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                        {teamPlayers.length === 0 && (
-                            <p className="text-xs text-muted-foreground/50">
-                            No players in this team yet.
-                            </p>
-                        )}
-
-                        {teamPlayers.map((player) => (
-                            <div
-                            key={player.id}
-                            className="rounded border border-border bg-background/60 px-2 py-2 text-xs flex flex-col gap-1"
-                            >
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium">
-                                {player.displayName}
-                                </span>
-                                <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[140px]">
-                                {player.id}
-                                </span>
-                            </div>
-
-                            <div className="mt-1 space-y-1">
-                                <label className="block text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                                Move to team
-                                </label>
-                                <select
-                                className="w-full rounded border border-input bg-background px-2 py-1 text-[11px]"
-                                value={player.teamId ?? ''}
-                                onChange={(e) =>
-                                    updatePlayerTeam(
-                                    player.id,
-                                    e.target.value === ''
-                                        ? null
-                                        : e.target.value,
-                                    )
-                                }
-                                disabled={isUpdating}
-                                >
-                                <option value="">No team</option>
-                                {(teams ?? []).map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                    {t.name}
-                                    </option>
-                                ))}
-                                </select>
-                            </div>
-                            </div>
-                        ))}
-                        </div>
-                    </div>
-                    );
-                })}
-                </section>
                 
                 <section>
                     <PrintMaterialsPanel gameId={gameId} />
@@ -385,6 +311,7 @@ export default function AdminGamePage({ params }: AdminPageProps) {
   }, [user, isUserLoading, router]);
 
   const handleSignOut = async () => {
+    if (!auth) return;
     await auth.signOut();
     router.push('/login');
   };

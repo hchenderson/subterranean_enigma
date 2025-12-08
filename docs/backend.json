@@ -134,80 +134,29 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/admins/{adminId}",
-        "definition": {
-          "entityName": "AdminUser",
-          "schema": {
-            "$ref": "#/backend/entities/AdminUser"
-          },
-          "description": "Stores admin user information. Only authenticated admins can read/write their own data.",
-          "params": [
-            {
-              "name": "adminId",
-              "description": "Unique identifier for the admin user."
-            }
-          ]
-        }
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "#/backend/entities/AdminUser"
       },
-      {
-        "path": "/participants/{participantId}",
-        "definition": {
-          "entityName": "ParticipantUser",
-          "schema": {
-            "$ref": "#/backend/entities/ParticipantUser"
-          },
-          "description": "Stores participant user information. Only someone with the correct code can read the data.",
-          "params": [
-            {
-              "name": "participantId",
-              "description": "Unique identifier for the participant user."
-            }
-          ]
-        }
+      "description": "Stores admin user information. Only authenticated admins can read/write their own data."
+    },
+    "/participants/{participantId}": {
+      "schema": {
+        "$ref": "#/backend/entities/ParticipantUser"
       },
-      {
-        "path": "/participants/{participantId}/gameState/{gameStateId}",
-        "definition": {
-          "entityName": "GameState",
-          "schema": {
-            "$ref": "#/backend/entities/GameState"
-          },
-          "description": "Stores the game state for each participant. The participant ID is included in each gameState document, ensuring data access is restricted to the appropriate participant.",
-          "params": [
-            {
-              "name": "participantId",
-              "description": "Unique identifier for the participant user."
-            },
-            {
-              "name": "gameStateId",
-              "description": "Unique identifier for the game state entry."
-            }
-          ]
-        }
+      "description": "Stores participant user information. Only someone with the correct code can read the data."
+    },
+    "/participants/{participantId}/gameState/{gameStateId}": {
+      "schema": {
+        "$ref": "#/backend/entities/GameState"
       },
-      {
-        "path": "/games/{gameId}/materials/{materialId}",
-        "definition": {
-          "entityName": "Material",
-          "schema": {
-            "$ref": "#/backend/entities/Material"
-          },
-          "description": "Stores printable materials associated with a specific game. Admins can read and update these materials.",
-          "params": [
-            {
-              "name": "gameId",
-              "description": "Unique identifier for the game."
-            },
-            {
-              "name": "materialId",
-              "description": "Unique identifier for the material."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore data structure is designed to support the login process, track the game state for each participant, and ensure secure access to the data. Authorization Independence is achieved by storing all necessary access control information directly within the documents, eliminating the need for `get()` calls in security rules. Segregation is applied to differentiate admin and participant data, and the `gameState` is structured under the user ID to ensure each user only has access to their own data.\n\n*   `/admins/{adminId}`: Stores admin user information. Security rules will ensure only authenticated admins can read/write their own data. This collection facilitates admin login.\n*   `/participants/{participantId}`: Stores participant user information using participant codes. Security rules will ensure that only someone with the correct code can read the data. This supports participant login and ensures that the correct game state is loaded for the participant.\n*   `/participants/{participantId}/gameState/{gameStateId}`: Stores the game state for each participant. The participant ID is included in each `gameState` document, ensuring data access is restricted to the appropriate participant. QAPs are maintained as list operations are secure because each participant's data is stored separately under their ID."
+      "description": "Stores the game state for each participant. The participant ID is included in each gameState document, ensuring data access is restricted to the appropriate participant."
+    },
+    "/games/{gameId}/materials/{materialId}": {
+      "schema": {
+        "$ref": "#/backend/entities/Material"
+      },
+      "description": "Stores printable materials associated with a specific game. Admins can read and update these materials."
+    }
   }
 }

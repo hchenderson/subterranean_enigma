@@ -51,6 +51,14 @@ export const PrintMaterialsPanel: React.FC<PrintMaterialsPanelProps> = ({
 
   const handlePrint = useCallback(
     async (material: Material) => {
+      if (!storage) {
+        toast({
+          variant: 'destructive',
+          title: 'Storage Error',
+          description: 'Firebase Storage is not available.'
+        });
+        return;
+      }
       try {
         setPrintingId(material.id);
 
@@ -59,7 +67,7 @@ export const PrintMaterialsPanel: React.FC<PrintMaterialsPanelProps> = ({
 
         window.open(url, '_blank', 'noopener,noreferrer');
 
-        if (isAdmin) {
+        if (isAdmin && firestore) {
           const matDocRef = doc(
             firestore,
             'games',
@@ -91,7 +99,8 @@ export const PrintMaterialsPanel: React.FC<PrintMaterialsPanelProps> = ({
         <CardHeader>
             <CardTitle>Print Materials</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex items-center justify-center p-6">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             <p className="text-muted-foreground">Loading materials...</p>
         </CardContent>
       </Card>
