@@ -114,6 +114,8 @@ service cloud.firestore {
      * @path /games/{gameId}
      */
     match /games/{gameId} {
+      // Allow admins full control over the game document itself
+      allow get, list, create, update, delete: if isAdmin();
       
       /**
        * The `participants` subcollection is special. It's a collection group that
@@ -121,10 +123,8 @@ service cloud.firestore {
        * to validate their entry code.
        */
       match /participants/{participantId} {
-        // Allow looking up a participant by code.
-        allow read: if true;
-        // Only admins can create/update/delete participant-code docs
-        allow write: if isAdmin();
+        allow read: if true; // for collectionGroup login lookup
+        allow write: if isAdmin(); // only admins create/update codes
       }
 
       // Admins have full control over all other subcollections within a game (e.g., hints, materials).
