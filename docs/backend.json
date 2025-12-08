@@ -64,29 +64,23 @@
           "type": "string",
           "description": "Reference to ParticipantUser. (Relationship: ParticipantUser 1:N GameState)"
         },
-        "archiveComplete": {
-          "type": "boolean",
-          "description": "Indicates if the Archive storyline is complete."
+        "completion": {
+          "type": "object",
+          "description": "Tracks completion status for each storyline.",
+          "properties": {
+            "archive": { "type": "boolean" },
+            "well": { "type": "boolean" },
+            "network": { "type": "boolean" }
+          }
         },
-        "wellComplete": {
-          "type": "boolean",
-          "description": "Indicates if the Mechanical Well storyline is complete."
-        },
-        "networkComplete": {
-          "type": "boolean",
-          "description": "Indicates if the Shrouded Network storyline is complete."
-        },
-        "archiveKey": {
-          "type": "boolean",
-          "description": "Indicates if the ECHOSPIRE key fragment has been collected."
-        },
-        "wellKey": {
-          "type": "boolean",
-          "description": "Indicates if the PULSAR-LINEAGE key fragment has been collected."
-        },
-        "networkKey": {
-          "type": "boolean",
-          "description": "Indicates if the AURELION-PRIME key fragment has been collected."
+        "keys": {
+          "type": "object",
+          "description": "Tracks collected key fragments.",
+          "properties": {
+            "archive": { "type": "boolean" },
+            "well": { "type": "boolean" },
+            "network": { "type": "boolean" }
+          }
         }
       },
       "required": [

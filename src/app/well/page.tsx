@@ -15,13 +15,15 @@ const roomData = ROOMS[ROOM_ID];
 const puzzles = PUZZLE_DATA[ROOM_ID];
 
 export default function WellPage() {
-  const { progress, collectKey, isLoaded } = useProgress();
+  const { progress, collectKey, completeStoryline, isLoaded } = useProgress();
   const [currentPuzzleIndex, setCurrentPuzzleIndex] = useState(0);
 
   const handleSolve = () => {
     if (currentPuzzleIndex < puzzles.length - 1) {
       setCurrentPuzzleIndex(prev => prev + 1);
     } else {
+      // Mark storyline as complete and collect the key
+      completeStoryline(ROOM_ID);
       collectKey(ROOM_ID);
     }
   };

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { RoomId, GameProgress, KeyFragments } from '@/lib/types';
+import type { RoomId, GameProgress } from '@/lib/types';
 import { useToast } from './use-toast';
-
-const PROGRESS_KEY = 'subterranean-enigma-progress';
+import { useUser, useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 const DEFAULT_PROGRESS: GameProgress = {
   keys: {
@@ -12,68 +12,107 @@ const DEFAULT_PROGRESS: GameProgress = {
     well: false,
     network: false,
   },
+  completion: {
+    archive: false,
+    well: false,
+    network: false,
+  }
 };
 
 export function useProgress() {
-  const [progress, setProgress] = useState<GameProgress>(DEFAULT_PROGRESS);
-  const [isLoaded, setIsLoaded] = useState(false);
   const { toast } = useToast();
+  const { user } = useUser();
+  const firestore = useFirestore();
 
+  const gameStateRef = useMemoFirebase(
+    () => (user ? doc(firestore, 'participants', user.uid, 'gameState', 'main') : null),
+    [user, firestore]
+  );
+  
+  const { data: progress, isLoading: isProgressLoading, error } = useDoc<GameProgress>(gameStateRef);
+
+  const isLoaded = !isProgressLoading && progress !== null;
+  
   useEffect(() => {
-    try {
-      const savedProgress = window.localStorage.getItem(PROGRESS_KEY);
-      if (savedProgress) {
-        setProgress(JSON.parse(savedProgress));
-      }
-    } catch (error) {
-      console.error("Failed to load progress from localStorage", error);
-    } finally {
-      setIsLoaded(true);
+    if (error) {
+        console.error("Error loading game progress:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Error Loading Progress',
+            description: 'Could not load your game state. Please try refreshing the page.'
+        })
     }
-  }, []);
+  }, [error, toast]);
 
-  const saveProgress = useCallback((newProgress: GameProgress) => {
-    try {
-      setProgress(newProgress);
-      window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(newProgress));
-    } catch (error) {
-      console.error("Failed to save progress to localStorage", error);
+
+  const completeStoryline = useCallback((roomId: RoomId) => {
+    if (!gameStateRef || progress?.completion[roomId]) return;
+
+    const newCompletionState = {
+        ...progress.completion,
+        [roomId]: true,
     }
-  }, []);
+
+    updateDocumentNonBlocking(gameStateRef, {
+        completion: newCompletionState
+    });
+
+  }, [gameStateRef, progress]);
+
 
   const collectKey = useCallback((roomId: RoomId) => {
-    if (progress.keys[roomId]) return; // Already have this key
+    if (!gameStateRef || progress?.keys[roomId]) return;
 
-    const newProgress = {
-      ...progress,
-      keys: {
+     const newKeyState = {
         ...progress.keys,
         [roomId]: true,
-      },
     };
-    saveProgress(newProgress);
+    const newCompletionState = {
+        ...progress.completion,
+        [roomId]: true,
+    }
+
+    updateDocumentNonBlocking(gameStateRef, {
+        keys: newKeyState,
+        completion: newCompletionState
+    });
+
     toast({
       title: "Key Fragment Acquired",
       description: `You have obtained the ${roomId.toUpperCase()}-KEY FRAGMENT.`,
     });
-  }, [progress, saveProgress, toast]);
+  }, [gameStateRef, progress, toast]);
+
 
   const resetProgress = useCallback(() => {
-    saveProgress(DEFAULT_PROGRESS);
+    if (!gameStateRef) return;
+    
+    const resetState = {
+        keys: DEFAULT_PROGRESS.keys,
+        completion: DEFAULT_PROGRESS.completion,
+        archiveComplete: false, // for legacy analytics compatibility
+        wellComplete: false,
+        networkComplete: false,
+    }
+    
+    setDocumentNonBlocking(gameStateRef, resetState, { merge: false });
+
     toast({
       title: "Progress Reset",
       description: "Your journey into the megastructure has been reset.",
     });
-  }, [saveProgress, toast]);
+  }, [gameStateRef, toast]);
+
 
   const isNexusUnlocked = useMemo(() => {
-    return Object.values(progress.keys).every(Boolean);
-  }, [progress.keys]);
+    return !!progress && Object.values(progress.keys).every(Boolean);
+  }, [progress]);
 
   return {
-    progress,
+    progress: progress ?? DEFAULT_PROGRESS,
     isLoaded,
     collectKey,
+    completeStoryline,
     resetProgress,
     isNexusUnlocked,
   };

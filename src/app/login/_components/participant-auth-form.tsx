@@ -123,12 +123,16 @@ export function ParticipantAuthForm({
       batch.set(gameStateRef, {
         id: 'main',
         participantUserId: user.uid,
-        archiveComplete: false,
-        wellComplete: false,
-        networkComplete: false,
-        archiveKey: false,
-        wellKey: false,
-        networkKey: false,
+        completion: {
+          archive: false,
+          well: false,
+          network: false,
+        },
+        keys: {
+          archive: false,
+          well: false,
+          network: false,
+        },
       });
 
       await batch.commit();

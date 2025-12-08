@@ -20,6 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { doc } from 'firebase/firestore';
+import type { GameProgress } from '@/lib/types';
 
 // Define the shape of a single participant passed in props
 type Participant = {
@@ -28,14 +29,6 @@ type Participant = {
   gameId: string;
 };
 
-// Define the shape of the gameState document
-type GameState = {
-  id: string;
-  participantUserId: string;
-  archiveComplete?: boolean;
-  wellComplete?: boolean;
-  networkComplete?: boolean;
-};
 
 // Component for a single participant's row
 const ParticipantProgressRow: React.FC<{ participant: Participant }> = ({ participant }) => {
@@ -48,7 +41,7 @@ const ParticipantProgressRow: React.FC<{ participant: Participant }> = ({ partic
   );
 
   // Use the useDoc hook to get real-time updates for the gameState
-  const { data: gameState, isLoading } = useDoc<GameState>(gameStateRef);
+  const { data: gameState, isLoading } = useDoc<GameProgress>(gameStateRef);
 
   if (isLoading) {
     return (
@@ -72,9 +65,9 @@ const ParticipantProgressRow: React.FC<{ participant: Participant }> = ({ partic
   return (
     <TableRow>
       <TableCell className="font-semibold">{participant.participantCode}</TableCell>
-      <TableCell className="text-center">{renderStatus(gameState?.archiveComplete)}</TableCell>
-      <TableCell className="text-center">{renderStatus(gameState?.wellComplete)}</TableCell>
-      <TableCell className="text-center">{renderStatus(gameState?.networkComplete)}</TableCell>
+      <TableCell className="text-center">{renderStatus(gameState?.completion?.archive)}</TableCell>
+      <TableCell className="text-center">{renderStatus(gameState?.completion?.well)}</TableCell>
+      <TableCell className="text-center">{renderStatus(gameState?.completion?.network)}</TableCell>
     </TableRow>
   );
 };

@@ -18,6 +18,13 @@ export interface KeyFragments {
   network: boolean;
 }
 
+export interface StorylineCompletion {
+  archive: boolean;
+  well: boolean;
+  network: boolean;
+}
+
 export interface GameProgress {
   keys: KeyFragments;
+  completion: StorylineCompletion;
 }
