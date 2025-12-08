@@ -91,7 +91,7 @@ function AdminConsoleContent() {
 
       <div className="space-y-8">
         <section id="create-game">
-          <h2 className="font-code text-lg text-primary/80 mb-2">> CREATE NEW GAME INSTANCE</h2>
+          <h2 className="font-code text-lg text-primary/80 mb-2">{'> CREATE NEW GAME INSTANCE'}</h2>
           <form onSubmit={handleCreateGame} className="flex gap-2">
             <Input
               type="text"
@@ -108,7 +108,7 @@ function AdminConsoleContent() {
         </section>
 
         <section id="game-list">
-          <h2 className="font-code text-lg text-primary/80 mb-2">> SELECT EXISTING INSTANCE</h2>
+          <h2 className="font-code text-lg text-primary/80 mb-2">{'> SELECT EXISTING INSTANCE'}</h2>
           <div className="border-2 border-primary/20 bg-black/30 p-4 space-y-2 rounded-md max-h-96 overflow-y-auto">
             {sortedGames && sortedGames.length > 0 ? (
               sortedGames.map(game => (
