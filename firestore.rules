@@ -27,6 +27,10 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    function isNotAnonymous() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider != "anonymous";
+    }
 
     /**
      * Returns true if the requesting user's UID matches the provided userId.
@@ -115,6 +119,15 @@ service cloud.firestore {
       allow update: if isExistingOwner(adminId) && isAdminDocImmutable();
       allow delete: if isExistingOwner(adminId);
     }
+    
+    match /games/{gameId} {
+      allow read, write: if isNotAnonymous();
+
+      match /{allChildren=**} {
+        allow read, write: if isNotAnonymous();
+      }
+    }
+
 
     /**
      * @description Secures participant user profile documents. Similar to admins, only the owner can manage their own document. Listing all participants is disabled.
