@@ -55,7 +55,7 @@ type AdminPageProps = {
   params: { gameId: string };
 };
 
-function AdminGamePageContent({ params: { gameId }, onSignOut }: { params: { gameId: string }, onSignOut: () => void }) {
+function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut: () => void }) {
     const firestore = useFirestore();
     const { toast } = useToast();
 
@@ -298,7 +298,7 @@ function AdminGamePageContent({ params: { gameId }, onSignOut }: { params: { gam
 }
 
 
-export default function AdminGamePage({ params }: AdminPageProps) {
+export default function AdminGamePage({ params: { gameId } }: AdminPageProps) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const auth = useAuth();
@@ -335,7 +335,7 @@ export default function AdminGamePage({ params }: AdminPageProps) {
         );
   }
 
-  return <AdminGamePageContent params={params} onSignOut={handleSignOut} />;
+  return <AdminGamePageContent gameId={gameId} onSignOut={handleSignOut} />;
 }
 
     
