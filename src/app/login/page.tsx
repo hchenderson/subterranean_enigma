@@ -15,7 +15,12 @@ function LoginPageContent() {
 
   useEffect(() => {
     if (!isUserLoading && user) {
-      router.push('/');
+      if (user.isAnonymous) {
+        router.push('/');
+      } else {
+        // Default admin to a specific game or dashboard
+        router.push('/admin/default-game');
+      }
     }
   }, [user, isUserLoading, router]);
 
