@@ -153,7 +153,7 @@ service cloud.firestore {
       allow get, update, delete: if isOwner(participantId);
       // Allow any user to create their own participant document upon first sign-in.
       allow create: if isOwner(participantId) && isCreatingOwnParticipantDoc(participantId);
-      allow list: if false; // Participants cannot list other participants
+      allow list: if isAdmin(); // Admins can list participants for analytics
 
       /**
        * @description Secures the game state for each participant. A participant can only access the game state stored within their own document tree.
