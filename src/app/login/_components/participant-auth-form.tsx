@@ -32,6 +32,8 @@ import {
   getDocs,
   doc,
   writeBatch,
+  QuerySnapshot,
+  DocumentData,
 } from 'firebase/firestore';
 
 const formSchema = z.object({
@@ -76,14 +78,24 @@ export function ParticipantAuthForm({
     }
 
     try {
-      // Use a collection group query to find the participant code across all games.
-      const generatedCodesRef = collectionGroup(firestore, 'generatedCodes');
-      const q = query(
-        generatedCodesRef,
-        where('participantCode', '==', data.code.toUpperCase())
-      );
-      
-      const querySnapshot = await getDocs(q);
+      // 1) Query for the code
+      let querySnapshot: QuerySnapshot<DocumentData>;
+      try {
+        const generatedCodesRef = collectionGroup(firestore, 'generatedCodes');
+        const q = query(
+          generatedCodesRef,
+          where('participantCode', '==', data.code.toUpperCase())
+        );
+        console.log('[Login] Running collectionGroup(generatedCodes) query...');
+        querySnapshot = await getDocs(q);
+        console.log('[Login] Query OK, docs found:', querySnapshot.size);
+      } catch (err: any) {
+        console.error('[Login] ERROR during collectionGroup query', {
+          code: err.code,
+          message: err.message,
+        });
+        throw err;
+      }
 
       if (querySnapshot.empty) {
         handleAuthError('Invalid participant code. Please try again.');
@@ -136,13 +148,24 @@ export function ParticipantAuthForm({
         },
       });
 
-      await batch.commit();
+      // 2) Commit the batch
+      try {
+        console.log('[Login] Committing batch writes...');
+        await batch.commit();
+        console.log('[Login] Batch commit OK');
+      } catch (err: any) {
+        console.error('[Login] ERROR during batch commit', {
+          code: err.code,
+          message: err.message,
+        });
+        throw err;
+      }
 
       // Redirect is handled by the useUser hook on the parent page
     } catch (error: any) {
       console.error('Participant Login Error:', error);
       if (error.code === 'permission-denied') {
-          handleAuthError('Could not validate participant code. The game might be paused or does not exist.');
+          handleAuthError('A permission error occurred. Check the console for details.');
       } else {
         handleAuthError('An unexpected error occurred during login.');
       }
