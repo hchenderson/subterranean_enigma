@@ -2,16 +2,14 @@
 /**
  * Core Philosophy: This ruleset enforces a strict user-ownership model that segregates administrative users from game participants. All data is private by default, and a user (whether an admin or participant) can only access documents that are directly associated with their unique user ID (UID).
  *
- * Data Structure: The data is organized into three primary top-level collections: `/admins` for administrators, `/games` for game-specific data like hints and materials, and `/participants` for game players. A participant's game progress is stored in a nested subcollection, `/participants/{participantId}/gameState`, ensuring that all of a user's data is contained within a single, securable data tree.
+ * Data Structure: The data is organized into three primary top-level collections: `/admins` for administrators, `/games` for game-specific data, and `/participants` for game players. A participant's game progress is stored in a nested subcollection, `/participants/{participantId}/gameState`. A separate `/games/{gameId}/generatedCodes` subcollection holds publicly readable join codes to keep them separate from private user data.
  *
  * Key Security Decisions:
- * - Strict Segregation: Admins and Participants are stored in separate collections to prevent any overlap in access rules.
- * - Ownership-Based Access: All rules for participant data are based on the principle that the authenticated user's UID must match the document ID in the path (e.g., `{participantId}`).
- * - Admin Access to Game Data: Authenticated, non-anonymous users (admins) have full access to the `/games` collection, which is necessary for them to manage game content like hints and materials.
- * - Joinable Games Logic: Unauthenticated users are permitted to query the `participants` collection group *only if* the parent game document has a flag `isJoinable == true`. This is a critical security gate for the login flow.
+ * - Strict Segregation: Admins and Participants are stored in separate collections. Public join codes are in a non-private subcollection under each game.
+ * - Ownership-Based Access: All rules for participant data are based on the principle that the authenticated user's UID must match the document ID in the path.
+ * - Admin Access to Game Data: Authenticated, non-anonymous users (admins) have full access to the `/games` collection and its subcollections.
+ * - Joinable Games Logic: Unauthenticated users are permitted to query the `generatedCodes` collection group, as these codes are public tokens for entry. The actual creation of a user profile is gated by authentication.
  * - Default Deny: Access is denied by default. All permissions must be explicitly granted.
- *
- * Denormalization for Authorization: The structure `/participants/{participantId}/gameState` uses the path itself as the primary authorization mechanism. This avoids the need for costly `get()` calls to a parent document when securing the `gameState` subcollection.
  *
  */
 rules_version = '2';
@@ -110,21 +108,21 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures game-wide data. Admins have full control. Participants have no access.
+     * @description Secures game-wide data. Admins have full control.
      * @path /games/{gameId}
      */
     match /games/{gameId} {
-      // Allow admins full control over the game document itself
+      // Allow admins full control over the game document itself.
       allow get, list, create, update, delete: if isAdmin();
       
       /**
-       * The `participants` subcollection is special. It's a collection group that
-       * needs to be queryable by unauthenticated users during the login flow
-       * to validate their entry code.
+       * @description Stores publicly readable join codes. Only admins can create/modify them.
        */
-      match /participants/{participantId} {
-        allow read: if true; // for collectionGroup login lookup
-        allow write: if isAdmin(); // only admins create/update codes
+      match /generatedCodes/{codeId} {
+        // Anyone can read codes for the collectionGroup lookup during login.
+        allow read: if true;
+        // Only admins can create, update, or delete the join codes.
+        allow write: if isAdmin();
       }
 
       // Admins have full control over all other subcollections within a game (e.g., hints, materials).
@@ -139,7 +137,6 @@ service cloud.firestore {
      */
     match /participants/{participantId} {
       allow get, update, delete: if isOwner(participantId);
-      // Allow any user to create their own participant document upon first sign-in.
       allow create: if isOwner(participantId) && isCreatingOwnParticipantDoc(participantId);
       allow list: if isAdmin(); // Admins can list participants for analytics
 

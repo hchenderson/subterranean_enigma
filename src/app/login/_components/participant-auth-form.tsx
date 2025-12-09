@@ -77,7 +77,7 @@ export function ParticipantAuthForm({
 
     try {
       // Use a collection group query to find the participant code across all games.
-      const generatedCodesRef = collectionGroup(firestore, 'participants');
+      const generatedCodesRef = collectionGroup(firestore, 'generatedCodes');
       const q = query(
         generatedCodesRef,
         where('participantCode', '==', data.code.toUpperCase())
@@ -94,7 +94,7 @@ export function ParticipantAuthForm({
       // The code is valid. Extract the gameId from the document's path.
       const generatedCodeDoc = querySnapshot.docs[0];
       const pathSegments = generatedCodeDoc.ref.path.split('/');
-      // The path is games/{gameId}/participants/{participantDocId}
+      // The path is games/{gameId}/generatedCodes/{codeId}
       const gameId = pathSegments[1];
 
       if (!gameId) {

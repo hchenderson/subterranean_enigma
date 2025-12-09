@@ -80,7 +80,7 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
     const { data: teams, isLoading: areTeamsLoading } = useCollection<Omit<Team, 'id'>>(teamsRef);
     
     // This fetches the generated codes, not the logged-in participants
-    const generatedCodesRef = useMemoFirebase(() => gameId ? collection(firestore, 'games', gameId, 'participants') : null, [firestore, gameId]);
+    const generatedCodesRef = useMemoFirebase(() => gameId ? collection(firestore, 'games', gameId, 'generatedCodes') : null, [firestore, gameId]);
     const { data: generatedCodes, isLoading: areCodesLoading } = useCollection<Omit<Participant, 'id'>>(generatedCodesRef);
 
     // This query finds all participant documents that are part of the current game.
