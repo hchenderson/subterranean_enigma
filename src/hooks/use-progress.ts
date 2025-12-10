@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { RoomId, GameProgress } from '@/lib/types';
 import { useToast } from './use-toast';
-import { useUser, useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 const DEFAULT_PROGRESS: GameProgress = {
   keys: {
@@ -45,7 +45,7 @@ export function useProgress() {
   }, [error, toast]);
 
 
-  const completeStoryline = useCallback((roomId: RoomId) => {
+  const completeStoryline = useCallback(async (roomId: RoomId) => {
     if (!gameStateRef || progress?.completion[roomId]) return;
 
     const newCompletionState = {
@@ -53,14 +53,14 @@ export function useProgress() {
         [roomId]: true,
     }
 
-    updateDocumentNonBlocking(gameStateRef, {
+    await updateDoc(gameStateRef, {
         completion: newCompletionState
     });
 
   }, [gameStateRef, progress]);
 
 
-  const collectKey = useCallback((roomId: RoomId) => {
+  const collectKey = useCallback(async (roomId: RoomId) => {
     if (!gameStateRef || progress?.keys[roomId]) return;
 
      const newKeyState = {
@@ -72,7 +72,7 @@ export function useProgress() {
         [roomId]: true,
     }
 
-    updateDocumentNonBlocking(gameStateRef, {
+    await updateDoc(gameStateRef, {
         keys: newKeyState,
         completion: newCompletionState
     });

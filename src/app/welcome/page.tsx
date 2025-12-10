@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { updateDoc, doc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
+import { doc } from 'firebase/firestore';
 import { AureliaMessage } from '@/components/game/AureliaMessage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,37 +26,23 @@ function WelcomePageContent() {
   );
   const { data: participant, isLoading: isParticipantLoading } = useDoc(participantRef);
 
-  // Unified loading / redirect guard
-  if (isUserLoading || isParticipantLoading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">Initializing Interface...</p>
-      </div>
-    );
-  }
+  const isLoading = isUserLoading || isParticipantLoading;
 
-  // Not logged in → back to login
-  if (!user) {
-    router.replace('/login');
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">Redirecting to login...</p>
-      </div>
-    );
-  }
+  // All redirects happen here, not during render
+  useEffect(() => {
+    if (isUserLoading || isParticipantLoading) return;
 
-  // Already has a displayName → they don’t belong here, send home
-  if (participant?.displayName) {
-    router.replace('/');
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">Loading your session...</p>
-      </div>
-    );
-  }
+    // Not logged in → login
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    // Already has a name → they shouldn’t be here, go home
+    if (participant?.displayName) {
+      router.replace('/');
+    }
+  }, [user, participant, isUserLoading, isParticipantLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,13 +50,14 @@ function WelcomePageContent() {
     setIsSubmitting(true);
 
     try {
-      // Use a proper awaited Firestore write
-      await updateDoc(participantRef, { displayName: displayName.trim() });
+      await updateDoc(participantRef, {
+        displayName: displayName.trim(),
+      });
       toast({
         title: 'Identity Confirmed',
         description: `Welcome to the system, ${displayName.trim()}.`,
       });
-      // Let the home page handle routing based on displayName
+      // It’s safe to navigate in an event handler
       router.replace('/');
     } catch (error) {
       console.error('Failed to update display name:', error);
@@ -83,6 +70,17 @@ function WelcomePageContent() {
     }
   };
 
+  // While loading, not logged in, or already named → just show loader while effect redirects
+  if (isLoading || !user || participant?.displayName) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Initializing Interface...</p>
+      </div>
+    );
+  }
+
+  // At this point we know: user exists, is anonymous, and has no displayName yet
   return (
     <main className="container mx-auto flex min-h-screen flex-col items-center justify-center p-4">
       <div className="w-full max-w-lg space-y-8">
