@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "AdminUser": {
@@ -46,6 +47,10 @@
         "displayName": {
           "type": "string",
           "description": "The participant's chosen display name."
+        },
+        "teamId": {
+          "type": "string",
+          "description": "The ID of the team this participant belongs to."
         }
       },
       "required": [
@@ -258,3 +263,5 @@
     }
   }
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -34,6 +35,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ProgressAnalyticsPanel } from '@/components/admin/ProgressAnalyticsPanel';
+import { TeamRosterPanel } from '@/components/admin/TeamRosterPanel';
 
 
 type GamePhase =
@@ -66,6 +68,8 @@ type Player = {
 type Participant = {
     id: string;
     participantCode: string;
+    displayName: string;
+    teamId: string | null;
 };
 
 function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut: () => void }) {
@@ -88,7 +92,7 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
       () => firestore ? query(collection(firestore, 'participants'), where('gameId', '==', gameId)) : null,
       [firestore, gameId]
     );
-    const { data: activeParticipants, isLoading: areParticipantsLoading } = useCollection(activeParticipantsQuery);
+    const { data: activeParticipants, isLoading: areParticipantsLoading } = useCollection<Participant>(activeParticipantsQuery);
 
 
     const [isUpdating, setIsUpdating] = useState(false);
@@ -199,7 +203,7 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
 
   return (
     <main className="min-h-screen bg-background text-foreground p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
         <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -278,6 +282,10 @@ function AdminGamePageContent({ gameId, onSignOut }: { gameId: string, onSignOut
 
         <div className="grid gap-8 lg:grid-cols-3">
             <div className="lg:col-span-2 space-y-6">
+                
+                <section>
+                    <TeamRosterPanel participants={activeParticipants} teams={teams} />
+                </section>
                 
                 <section>
                     <ProgressAnalyticsPanel participants={activeParticipants} />
@@ -394,3 +402,5 @@ export default function AdminGamePage() {
 
   return <AdminGamePageContent gameId={gameId} onSignOut={handleSignOut} />;
 }
+
+    
