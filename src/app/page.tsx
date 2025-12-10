@@ -179,12 +179,6 @@ function HomePageContent() {
             </Link>
           </div>
         </section>
-
-        <footer className="text-center">
-          <Button variant="ghost" size="sm" onClick={resetProgress}>
-            Reset Progress
-          </Button>
-        </footer>
       </div>
     </main>
   );
