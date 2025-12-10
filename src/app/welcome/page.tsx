@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { updateDoc, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
 import { AureliaMessage } from '@/components/game/AureliaMessage';
 import { useToast } from '@/hooks/use-toast';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
@@ -20,45 +20,59 @@ function WelcomePageContent() {
 
   const [displayName, setDisplayName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const participantRef = useMemoFirebase(() => (user ? doc(firestore, 'participants', user.uid) : null), [user, firestore]);
+
+  const participantRef = useMemoFirebase(
+    () => (user ? doc(firestore, 'participants', user.uid) : null),
+    [user, firestore]
+  );
   const { data: participant, isLoading: isParticipantLoading } = useDoc(participantRef);
 
-  // Effect to handle redirection
-  useEffect(() => {
-    // Don’t do anything until both user and participant states are resolved
-    if (isUserLoading || isParticipantLoading) return;
+  // Unified loading / redirect guard
+  if (isUserLoading || isParticipantLoading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Initializing Interface...</p>
+      </div>
+    );
+  }
 
-    // Not logged in → back to login
-    if (!user) {
-      router.replace('/login');
-      return;
-    }
+  // Not logged in → back to login
+  if (!user) {
+    router.replace('/login');
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Redirecting to login...</p>
+      </div>
+    );
+  }
 
-    // Anonymous user but already has a display name (e.g. returning) → go home
-    if (participant?.displayName) {
-      router.replace('/');
-    }
-  }, [user, participant, isUserLoading, isParticipantLoading, router]);
+  // Already has a displayName → they don’t belong here, send home
+  if (participant?.displayName) {
+    router.replace('/');
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Loading your session...</p>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!displayName.trim() || !participantRef) return;
     setIsSubmitting(true);
-    
-    try {
-      // IMPORTANT: use a truly awaited Firestore update here.
-      await updateDoc(participantRef, {
-        displayName: displayName.trim(),
-      });
 
+    try {
+      // Use a proper awaited Firestore write
+      await updateDoc(participantRef, { displayName: displayName.trim() });
       toast({
         title: 'Identity Confirmed',
         description: `Welcome to the system, ${displayName.trim()}.`,
       });
-
-      // Do NOT navigate here – let the effect below redirect
-      // once participant.displayName is visible.
+      // Let the home page handle routing based on displayName
+      router.replace('/');
     } catch (error) {
       console.error('Failed to update display name:', error);
       toast({
@@ -69,17 +83,6 @@ function WelcomePageContent() {
       setIsSubmitting(false);
     }
   };
-  
-  const isLoading = isUserLoading || isParticipantLoading;
-
-  if (isLoading || (participant && participant.displayName)) {
-     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">Initializing Interface...</p>
-      </div>
-    );
-  }
 
   return (
     <main className="container mx-auto flex min-h-screen flex-col items-center justify-center p-4">
@@ -103,9 +106,7 @@ function WelcomePageContent() {
             />
           </div>
           <Button type="submit" disabled={isSubmitting || !displayName.trim()} className="w-full">
-            {isSubmitting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : null}
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Confirm Designation
           </Button>
         </form>
@@ -115,9 +116,9 @@ function WelcomePageContent() {
 }
 
 export default function WelcomePage() {
-    return (
-        <FirebaseClientProvider>
-            <WelcomePageContent />
-        </FirebaseClientProvider>
-    )
+  return (
+    <FirebaseClientProvider>
+      <WelcomePageContent />
+    </FirebaseClientProvider>
+  );
 }
