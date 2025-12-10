@@ -27,6 +27,7 @@ type Participant = {
   id: string; // This is the user's UID
   participantCode: string;
   gameId: string;
+  displayName?: string;
 };
 
 
@@ -46,7 +47,7 @@ const ParticipantProgressRow: React.FC<{ participant: Participant }> = ({ partic
   if (isLoading) {
     return (
       <TableRow>
-        <TableCell className="font-mono text-xs">{participant.participantCode}</TableCell>
+        <TableCell className="font-mono text-xs">{participant.displayName || participant.participantCode}</TableCell>
         <TableCell colSpan={3} className="text-center">
           <Loader2 className="h-4 w-4 animate-spin inline-block" />
         </TableCell>
@@ -64,7 +65,7 @@ const ParticipantProgressRow: React.FC<{ participant: Participant }> = ({ partic
 
   return (
     <TableRow>
-      <TableCell className="font-semibold">{participant.participantCode}</TableCell>
+      <TableCell className="font-semibold">{participant.displayName || `(${participant.participantCode})`}</TableCell>
       <TableCell className="text-center">{renderStatus(gameState?.completion?.archive)}</TableCell>
       <TableCell className="text-center">{renderStatus(gameState?.completion?.well)}</TableCell>
       <TableCell className="text-center">{renderStatus(gameState?.completion?.network)}</TableCell>
@@ -95,7 +96,7 @@ export const ProgressAnalyticsPanel: React.FC<ProgressAnalyticsPanelProps> = ({ 
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Participant Code</TableHead>
+                <TableHead>Participant</TableHead>
                 <TableHead className="text-center">Archive</TableHead>
                 <TableHead className="text-center">Well</TableHead>
                 <TableHead className="text-center">Network</TableHead>

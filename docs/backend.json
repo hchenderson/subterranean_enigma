@@ -42,6 +42,10 @@
         "gameId": {
           "type": "string",
           "description": "The ID of the game this participant belongs to."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The participant's chosen display name."
         }
       },
       "required": [

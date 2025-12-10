@@ -16,7 +16,8 @@ function LoginPageContent() {
   useEffect(() => {
     if (!isUserLoading && user) {
       if (user.isAnonymous) {
-        router.push('/');
+        // New participants go to the welcome page to set their name
+        router.push('/welcome');
       } else {
         // Default admin to the new admin console page
         router.push('/admin');

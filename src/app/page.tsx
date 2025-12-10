@@ -12,9 +12,10 @@ import { useProgress } from '@/hooks/use-progress';
 import { cn } from '@/lib/utils';
 import { Lock, Play, CheckCircle, ShieldCheck, LogOut, Loader2 } from 'lucide-react';
 import { ROOMS } from '@/lib/puzzles';
-import { FirebaseClientProvider, useAuth, useUser } from '@/firebase';
+import { FirebaseClientProvider, useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { doc } from 'firebase/firestore';
 
 
 function HomePageContent() {
@@ -22,19 +23,28 @@ function HomePageContent() {
   const auth = useAuth();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const firestore = useFirestore();
+
+  const participantRef = useMemoFirebase(() => (user ? doc(firestore, 'participants', user.uid) : null), [user, firestore]);
+  const { data: participant, isLoading: isParticipantLoading } = useDoc(participantRef);
 
   useEffect(() => {
     if (!isUserLoading) {
       if (!user) {
         router.push('/login');
-      } else if (!user.isAnonymous) {
-        // If the user is an admin, redirect them away from the participant home page.
+      } else if (user.isAnonymous) {
+        // If user is anonymous but we haven't loaded their profile OR they have no display name, redirect to welcome.
+        if (!isParticipantLoading && !participant?.displayName) {
+          router.push('/welcome');
+        }
+      } else {
+        // If the user is a full admin, redirect them away from the participant home page.
         router.push('/admin');
       }
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, participant, isParticipantLoading, router]);
 
-  if (isUserLoading || !user || !user.isAnonymous) {
+  if (isUserLoading || isParticipantLoading || !user || !participant?.displayName) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -44,6 +54,7 @@ function HomePageContent() {
   }
 
   const handleSignOut = async () => {
+    if (!auth) return;
     await auth.signOut();
     resetProgress(); // Also clears local storage progress
     router.push('/login');
@@ -58,7 +69,7 @@ function HomePageContent() {
               Subterranean Enigma
             </h1>
             <p className="mt-4 text-lg text-muted-foreground">
-              An AURELIA-Governed Deep System Interface
+              Welcome, {participant.displayName}.
             </p>
           </div>
           <Button variant="ghost" onClick={handleSignOut}>
@@ -67,7 +78,7 @@ function HomePageContent() {
           </Button>
         </header>
 
-        <AureliaMessage text="Unknown entity detected. Identity validation required. Access to subroutine sectors is... provisional. Proceed." />
+        <AureliaMessage text={`Designation "${participant.displayName}" confirmed. Access to subroutine sectors is... provisional. Proceed.`} />
 
         <section>
           <h2 className="mb-4 text-center font-headline text-3xl font-bold text-primary/80">
