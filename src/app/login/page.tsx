@@ -7,7 +7,6 @@ import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 function LoginPageContent() {
   const { user, isUserLoading } = useUser();
@@ -68,8 +67,6 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <FirebaseClientProvider>
       <LoginPageContent />
-    </FirebaseClientProvider>
   );
 }

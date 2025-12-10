@@ -1,23 +1,24 @@
 
-"use client";
+'use client';
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArchiveIcon } from '@/components/icons/ArchiveIcon';
-import { WellIcon } from '@/components/icons/WellIcon';
-import { NetworkIcon } from '@/components/icons/NetworkIcon';
 import { KeyFragmentDisplay } from '@/components/game/KeyFragmentDisplay';
 import { AureliaMessage } from '@/components/game/AureliaMessage';
 import { useProgress } from '@/hooks/use-progress';
 import { cn } from '@/lib/utils';
 import { Lock, Play, CheckCircle, ShieldCheck, LogOut, Loader2 } from 'lucide-react';
 import { ROOMS } from '@/lib/puzzles';
-import { FirebaseClientProvider, useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import {
+  useAuth,
+  useUser,
+  useFirestore,
+  useDoc,
+  useMemoFirebase,
+} from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { doc } from 'firebase/firestore';
-
 
 function HomePageContent() {
   const { progress, isNexusUnlocked, resetProgress } = useProgress();
@@ -26,33 +27,16 @@ function HomePageContent() {
   const router = useRouter();
   const firestore = useFirestore();
 
-  const participantRef = useMemoFirebase(() => (user ? doc(firestore, 'participants', user.uid) : null), [user, firestore]);
+  const participantRef = useMemoFirebase(
+    () => (user ? doc(firestore, 'participants', user.uid) : null),
+    [user, firestore]
+  );
   const { data: participant, isLoading: isParticipantLoading } = useDoc(participantRef);
 
-  useEffect(() => {
-    if (isUserLoading || isParticipantLoading) return;
+  // --- Unified routing / loading guard ---
 
-    // No user at all → login
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    // Anonymous participant
-    if (user.isAnonymous) {
-      // If participant doc is loaded and missing displayName → go to welcome
-      if (!participant?.displayName) {
-        router.push('/welcome');
-      }
-      // Otherwise (has displayName) stay on `/` and show the game
-      return;
-    }
-
-    // Non-anonymous user → admin console
-    router.push('/admin');
-  }, [user, participant, isUserLoading, isParticipantLoading, router]);
-
-  if (isUserLoading || isParticipantLoading || !user || !participant?.displayName) {
+  // Still resolving auth or participant doc → just show loader
+  if (isUserLoading || isParticipantLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -61,10 +45,46 @@ function HomePageContent() {
     );
   }
 
+  // No user at all → send to login
+  if (!user) {
+    router.replace('/login');
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Redirecting to login...</p>
+      </div>
+    );
+  }
+
+  // Non-anonymous → they’re an admin, not a participant
+  if (!user.isAnonymous) {
+    router.replace('/admin');
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Redirecting to admin console...</p>
+      </div>
+    );
+  }
+
+  // Anonymous but no participant doc or no displayName yet → must go to welcome
+  if (!participant || !participant.displayName) {
+    router.replace('/welcome');
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Preparing welcome interface...</p>
+      </div>
+    );
+  }
+
+  // --- If we reach this point, we KNOW:
+  // user exists, isAnonymous === true, participant exists, and has displayName.
+
   const handleSignOut = async () => {
     if (!auth) return;
     await auth.signOut();
-    resetProgress(); // Also clears local storage progress
+    resetProgress();
     router.push('/login');
   };
 
@@ -86,7 +106,9 @@ function HomePageContent() {
           </Button>
         </header>
 
-        <AureliaMessage text={`Designation "${participant.displayName}" confirmed. Access to subroutine sectors is... provisional. Proceed.`} />
+        <AureliaMessage
+          text={`Designation "${participant.displayName}" confirmed. Access to subroutine sectors is... provisional. Proceed.`}
+        />
 
         <section>
           <h2 className="mb-4 text-center font-headline text-3xl font-bold text-primary/80">
@@ -114,7 +136,17 @@ function HomePageContent() {
                     <p className="text-sm text-muted-foreground">{room.description}</p>
                     <Link href={`/${room.id}`} passHref>
                       <Button className="w-full">
-                        {isCompleted ? <><CheckCircle className="mr-2 h-4 w-4" />Completed</> : <><Play className="mr-2 h-4 w-4" />Enter Sector</>}
+                        {isCompleted ? (
+                          <>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Completed
+                          </>
+                        ) : (
+                          <>
+                            <Play className="mr-2 h-4 w-4" />
+                            Enter Sector
+                          </>
+                        )}
                       </Button>
                     </Link>
                   </CardContent>
@@ -131,7 +163,11 @@ function HomePageContent() {
           <KeyFragmentDisplay keys={progress.keys} />
           <div className="mt-6 text-center">
             <Link href="/nexus" passHref>
-              <Button size="lg" disabled={!isNexusUnlocked} aria-label={isNexusUnlocked ? 'Enter Nexus Convergence' : 'Nexus Locked'}>
+              <Button
+                size="lg"
+                disabled={!isNexusUnlocked}
+                aria-label={isNexusUnlocked ? 'Enter Nexus Convergence' : 'Nexus Locked'}
+              >
                 {isNexusUnlocked ? (
                   <ShieldCheck className="mr-2 h-5 w-5" />
                 ) : (
@@ -144,7 +180,9 @@ function HomePageContent() {
         </section>
 
         <footer className="text-center">
-          <Button variant="ghost" size="sm" onClick={resetProgress}>Reset Progress</Button>
+          <Button variant="ghost" size="sm" onClick={resetProgress}>
+            Reset Progress
+          </Button>
         </footer>
       </div>
     </main>
@@ -152,9 +190,7 @@ function HomePageContent() {
 }
 
 export default function Home() {
-    return (
-        <FirebaseClientProvider>
-            <HomePageContent />
-        </FirebaseClientProvider>
-    )
+  return (
+      <HomePageContent />
+  );
 }

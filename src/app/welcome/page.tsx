@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
 import { AureliaMessage } from '@/components/game/AureliaMessage';
 import { useToast } from '@/hooks/use-toast';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 function WelcomePageContent() {
   const { user, isUserLoading } = useUser();
@@ -117,8 +116,6 @@ function WelcomePageContent() {
 
 export default function WelcomePage() {
   return (
-    <FirebaseClientProvider>
       <WelcomePageContent />
-    </FirebaseClientProvider>
   );
 }
