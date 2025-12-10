@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -36,44 +35,22 @@ function HomePageContent() {
 
   const isLoading = isUserLoading || isParticipantLoading;
 
-  // All routing logic lives here
+  // Only handle *login/admin* routing here
   useEffect(() => {
     if (isUserLoading || isParticipantLoading) return;
 
-    // Not logged in → login
+    // Not logged in → login page
     if (!user) {
       router.replace('/login');
       return;
     }
 
-    // Non-anonymous → admin console
+    // Any non-anonymous user is an admin → admin console
     if (!user.isAnonymous) {
       router.replace('/admin');
       return;
     }
-
-    // Anonymous but no name yet → welcome
-    if (!participant?.displayName) {
-      router.replace('/welcome');
-      return;
-    }
-  }, [user, participant, isUserLoading, isParticipantLoading, router]);
-
-  // Decide whether we’re allowed to show the main participant UI
-  const readyForMain =
-    !!user && user.isAnonymous && !!participant?.displayName && !isLoading;
-
-  // While things are loading OR a redirect is about to happen, just show a loader
-  if (!readyForMain) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="text-muted-foreground">
-          {isLoading ? 'Authenticating...' : 'Redirecting...'}
-        </p>
-      </div>
-    );
-  }
+  }, [user, isUserLoading, isParticipantLoading, router]);
 
   const handleSignOut = async () => {
     if (!auth) return;
@@ -82,6 +59,36 @@ function HomePageContent() {
     router.push('/login');
   };
 
+  // While auth/participant is loading or we’re redirecting, show a loader
+  if (isLoading || !user) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Authenticating...</p>
+      </div>
+    );
+  }
+
+  // At this point we know: user exists and is anonymous.
+  // If they *don’t* have a displayName yet, gently block and send them to /welcome via a button.
+  if (!participant?.displayName) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <div className="text-center space-y-3 max-w-md">
+          <p className="text-lg font-semibold">Almost there…</p>
+          <p className="text-sm text-muted-foreground">
+            You need to confirm your designation before entering the Subterranean Enigma.
+          </p>
+          <Link href="/welcome">
+            <Button>Confirm Your Designation</Button>
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  // ✅ Fully ready: anonymous user with a displayName → show the game UI
   return (
     <main className="container mx-auto flex min-h-screen flex-col items-center justify-center p-4 sm:p-8">
       <div className="w-full max-w-5xl space-y-8">
