@@ -32,7 +32,7 @@ function HomePageContent() {
   useEffect(() => {
     if (isUserLoading || isParticipantLoading) return;
 
-    // No user at all → back to login
+    // No user at all → login
     if (!user) {
       router.push('/login');
       return;
@@ -40,11 +40,12 @@ function HomePageContent() {
 
     // Anonymous participant
     if (user.isAnonymous) {
-      // If no displayName yet, go to welcome
+      // If participant doc is loaded and missing displayName → go to welcome
       if (!participant?.displayName) {
         router.push('/welcome');
       }
-      return; // Don’t fall through to admin redirect
+      // Otherwise (has displayName) stay on `/` and show the game
+      return;
     }
 
     // Non-anonymous user → admin console
