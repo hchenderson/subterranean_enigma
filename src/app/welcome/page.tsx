@@ -1,13 +1,12 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser, useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
-import { doc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { AureliaMessage } from '@/components/game/AureliaMessage';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,7 +29,7 @@ function WelcomePageContent() {
 
   // All redirects happen here, not during render
   useEffect(() => {
-    if (isUserLoading || isParticipantLoading) return;
+    if (isLoading) return;
 
     // Not logged in → login
     if (!user) {
@@ -42,7 +41,7 @@ function WelcomePageContent() {
     if (participant?.displayName) {
       router.replace('/');
     }
-  }, [user, participant, isUserLoading, isParticipantLoading, router]);
+  }, [user, participant, isLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,8 +56,7 @@ function WelcomePageContent() {
         title: 'Identity Confirmed',
         description: `Welcome to the system, ${displayName.trim()}.`,
       });
-      // It’s safe to navigate in an event handler
-      router.replace('/');
+      // The useEffect above will handle the redirect once `participant.displayName` is loaded.
     } catch (error) {
       console.error('Failed to update display name:', error);
       toast({
