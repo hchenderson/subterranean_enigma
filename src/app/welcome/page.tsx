@@ -56,7 +56,7 @@ function WelcomePageContent() {
         title: 'Identity Confirmed',
         description: `Welcome to the system, ${displayName.trim()}.`,
       });
-      // The useEffect above will handle the redirect once `participant.displayName` is loaded.
+      router.push('/');
     } catch (error) {
       console.error('Failed to update display name:', error);
       toast({
