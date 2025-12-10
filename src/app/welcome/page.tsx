@@ -26,15 +26,20 @@ function WelcomePageContent() {
 
   // Effect to handle redirection
   useEffect(() => {
-    if (!isUserLoading && !user) {
-      // If not logged in, go back to login
+    // Don’t do anything until both user and participant states are resolved
+    if (isUserLoading || isParticipantLoading) return;
+
+    // Not logged in → back to login
+    if (!user) {
       router.replace('/login');
+      return;
     }
-    if (!isParticipantLoading && participant?.displayName) {
-        // If user is loaded and already has a name, go to home
-        router.replace('/');
+
+    // Anonymous user but already has a display name (e.g. returning) → go home
+    if (participant?.displayName) {
+      router.replace('/');
     }
-  }, [user, isUserLoading, participant, isParticipantLoading, router]);
+  }, [user, participant, isUserLoading, isParticipantLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

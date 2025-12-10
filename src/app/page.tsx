@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -29,20 +30,26 @@ function HomePageContent() {
   const { data: participant, isLoading: isParticipantLoading } = useDoc(participantRef);
 
   useEffect(() => {
-    if (!isUserLoading) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.isAnonymous) {
-        // If user is anonymous but we haven't loaded their profile OR they have no display name, redirect to welcome.
-        if (!isParticipantLoading && !participant?.displayName) {
-          router.push('/welcome');
-        }
-      } else {
-        // If the user is a full admin, redirect them away from the participant home page.
-        router.push('/admin');
-      }
+    if (isUserLoading || isParticipantLoading) return;
+
+    // No user at all → back to login
+    if (!user) {
+      router.push('/login');
+      return;
     }
-  }, [user, isUserLoading, participant, isParticipantLoading, router]);
+
+    // Anonymous participant
+    if (user.isAnonymous) {
+      // If no displayName yet, go to welcome
+      if (!participant?.displayName) {
+        router.push('/welcome');
+      }
+      return; // Don’t fall through to admin redirect
+    }
+
+    // Non-anonymous user → admin console
+    router.push('/admin');
+  }, [user, participant, isUserLoading, isParticipantLoading, router]);
 
   if (isUserLoading || isParticipantLoading || !user || !participant?.displayName) {
     return (
