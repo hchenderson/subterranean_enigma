@@ -1,149 +1,87 @@
-
-/**
- * Core Philosophy: This ruleset enforces a strict user-ownership model that segregates administrative users from game participants. All data is private by default, and a user (whether an admin or participant) can only access documents that are directly associated with their unique user ID (UID).
- *
- * Data Structure: The data is organized into three primary top-level collections: `/admins` for administrators, `/games` for game-specific data, and `/participants` for game players. A participant's game progress is stored in a nested subcollection, `/participants/{participantId}/gameState`. A separate `/games/{gameId}/generatedCodes` subcollection holds publicly readable join codes to keep them separate from private user data.
- *
- * Key Security Decisions:
- * - Strict Segregation: Admins and Participants are stored in separate collections. Public join codes are in a non-private subcollection under each game.
- * - Ownership-Based Access: All rules for participant data are based on the principle that the authenticated user's UID must match the document ID in the path.
- * - Admin Access to Game Data: Authenticated, non-anonymous users (admins) have full access to the `/games` collection and its subcollections.
- * - Joinable Games Logic: Unauthenticated users are permitted to query the `generatedCodes` collection group, as these codes are public tokens for entry. The actual creation of a user profile is gated by authentication.
- * - Default Deny: Access is denied by default. All permissions must be explicitly granted.
- *
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ------------------------------------------------------------------------
-    // Helper Functions
-    // ------------------------------------------------------------------------
-
-    /**
-     * Returns true if the user is signed in.
-     */
+    // ---------- Helpers ----------
     function isSignedIn() {
       return request.auth != null;
     }
     
-    /**
-     * Returns true if the user is a logged-in admin (not anonymous).
-     */
     function isAdmin() {
       return isSignedIn() && request.auth.token.firebase.sign_in_provider != "anonymous";
     }
 
-    /**
-     * Returns true if the requesting user's UID matches the provided userId.
-     * This is the core of the ownership model.
-     * @param userId The UID of the document owner.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /**
-     * Validates that the AdminUser document being created contains an 'id' field
-     * that matches the document's ID in the path, ensuring relational integrity.
-     * @param adminId The document ID from the Firestore path.
-     */
     function isCreatingOwnAdminDoc(adminId) {
       return request.resource.data.id == adminId;
     }
 
-    /**
-     * Enforces immutability for the critical 'id' field on an AdminUser document
-     * during an update operation, preventing ownership from being changed.
-     */
     function isAdminDocImmutable() {
       return request.resource.data.id == resource.data.id;
     }
 
-    /**
-     * Validates that the ParticipantUser document being created contains an 'id'
-     * field that matches the document's ID, ensuring relational integrity.
-     * @param participantId The document ID from the Firestore path.
-     */
     function isCreatingOwnParticipantDoc(participantId) {
       return request.resource.data.id == participantId;
     }
 
-    /**
-     * Enforces immutability for the critical 'id' field on a ParticipantUser document.
-     */
     function isParticipantDocImmutable() {
       return request.resource.data.id == resource.data.id;
     }
 
-    /**
-     * Validates that the GameState document being created has a 'participantUserId'
-     * that correctly links it back to its parent participant document.
-     * @param participantId The parent participant's ID from the Firestore path.
-     */
     function isCreatingValidGameState(participantId) {
       return request.resource.data.participantUserId == participantId;
     }
 
-    /**
-     * Enforces immutability for the critical 'participantUserId' field on a
-     * GameState document, preventing the record from being moved between users.
-     */
     function isGameStateImmutable() {
       return request.resource.data.participantUserId == resource.data.participantUserId;
     }
 
-    // ------------------------------------------------------------------------
-    // Collection Rules
-    // ------------------------------------------------------------------------
+    // ---------- /admins ----------
 
-    /**
-     * @description Secures admin user profile documents. Only the owner of the document can read, create, update, or delete it. Listing all admins is disabled.
-     * @path /admins/{adminId}
-     */
     match /admins/{adminId} {
       allow get, update, delete: if isOwner(adminId);
       allow create: if isOwner(adminId) && isCreatingOwnAdminDoc(adminId);
       allow list: if false;
     }
 
-    /**
-     * @description Secures game-wide data. Admins have full control.
-     * @path /games/{gameId}
-     */
+    // ---------- /games + /games/{gameId}/generatedCodes ----------
+
     match /games/{gameId} {
-      // Allow admins full control over the game document itself.
+      // Admin access to the game document itself
       allow get, list, create, update, delete: if isAdmin();
-      
-      /**
-       * @description Stores publicly readable join codes. Only admins can create/modify them.
-       */
+
+      // Join codes live here: /games/{gameId}/generatedCodes/{codeId}
       match /generatedCodes/{codeId} {
-        // Anyone can read codes for the collectionGroup lookup during login.
+        // Anyone can read codes (for login lookup via collectionGroup)
         allow read: if true;
-        // Only admins can create, update, or delete the join codes.
+
+        // Only admins can create/update/delete codes
         allow write: if isAdmin();
       }
 
-      // Admins have full control over all other subcollections within a game (e.g., hints, materials).
-      match /{allChildren=**} {
+      // Other nested collections (hints, materials, etc.) – admin only
+      match /hints/{hintId} {
+        allow read, write: if isAdmin();
+      }
+      match /materials/{materialId} {
+        allow read, write: if isAdmin();
+      }
+      match /teamHints/{teamHintId} {
         allow read, write: if isAdmin();
       }
     }
 
-    /**
-     * @description Secures participant user profile documents. A participant can only create and manage their own document.
-     * @path /participants/{participantId}
-     */
+    // ---------- /participants (profile + gameState) ----------
+
     match /participants/{participantId} {
+      // Each user can see & manage their own participant profile
       allow get, update, delete: if isOwner(participantId);
       allow create: if isOwner(participantId) && isCreatingOwnParticipantDoc(participantId);
-      allow list: if isAdmin(); // Admins can list participants for analytics
+      allow list: if isAdmin(); // keep this if you want admin analytics
 
-      /**
-       * @description Secures the game state for each participant. A participant can only access the game state stored within their own document tree.
-       * @path /participants/{participantId}/gameState/{gameStateId}
-       */
       match /gameState/{gameStateId} {
         allow get, list, update, delete: if isOwner(participantId);
         allow create: if isOwner(participantId) && isCreatingValidGameState(participantId);
