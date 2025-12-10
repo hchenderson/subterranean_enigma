@@ -3,11 +3,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser, useFirestore, updateDocumentNonBlocking, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2 } from 'lucide-react';
-import { doc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { AureliaMessage } from '@/components/game/AureliaMessage';
 import { useToast } from '@/hooks/use-toast';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
@@ -47,12 +47,18 @@ function WelcomePageContent() {
     setIsSubmitting(true);
     
     try {
-      await updateDocumentNonBlocking(participantRef, { displayName: displayName.trim() });
+      // IMPORTANT: use a truly awaited Firestore update here.
+      await updateDoc(participantRef, {
+        displayName: displayName.trim(),
+      });
+
       toast({
         title: 'Identity Confirmed',
         description: `Welcome to the system, ${displayName.trim()}.`,
       });
-      router.push('/');
+
+      // Do NOT navigate here – let the effect below redirect
+      // once participant.displayName is visible.
     } catch (error) {
       console.error('Failed to update display name:', error);
       toast({
