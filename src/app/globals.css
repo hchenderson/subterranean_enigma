@@ -117,4 +117,34 @@
   .vault-puzzle-shell {
     @apply border-t border-dashed border-border pt-4 mt-4;
   }
+  .vault-log {
+      @apply bg-black/20 p-3 rounded-md border border-input text-xs;
+    }
+  .vault-log-table {
+    @apply w-full text-left font-code;
+  }
+  .vault-log-table th {
+    @apply font-semibold text-muted-foreground pb-2;
+  }
+  .vault-log-table td {
+    @apply py-1 pr-4;
+  }
+  .vault-log-index {
+    @apply text-muted-foreground;
+  }
+  .vault-log-guess {
+    @apply font-bold text-foreground;
+  }
+  .vault-log-bulls, .vault-log-cows {
+    @apply font-bold;
+  }
+  .vault-log-bulls {
+    @apply text-green-400;
+  }
+  .vault-log-cows {
+    @apply text-amber-400;
+  }
+  .vault-log-bulls.is-zero, .vault-log-cows.is-zero {
+    @apply text-muted-foreground/50 font-normal;
+  }
 }
